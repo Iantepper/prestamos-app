@@ -11,7 +11,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { listarClientes, type Cliente } from '@/db/clientes';
-import { crearPrestamo } from '@/db/prestamos';
+import { crearPrestamo, listarPrestamosActivos, type PrestamoActivo } from '@/db/prestamos';
 import { calcularCuotas, totalADevolver, type DatosPrestamo, type Frecuencia } from '@/utils/cuotas';
 import {
   formatearFecha,
@@ -49,17 +49,26 @@ export default function PrestamosScreen() {
   const [fecha, setFecha] = useState(() => formatearFecha(hoyISO()));
   const [errores, setErrores] = useState<Errores>({});
 
-  // Se recarga cada vez que se entra a la pestaña, por si se cargó un cliente nuevo.
+  const [prestamos, setPrestamos] = useState<PrestamoActivo[]>([]);
+  const [recarga, setRecarga] = useState(0);
+
+  // Se recarga cada vez que se entra a la pestaña (por si se cargó un cliente nuevo)
+  // y después de guardar un préstamo.
   useFocusEffect(
     useCallback(() => {
       let activo = true;
-      listarClientes(db).then((filas) => {
-        if (activo) setClientes(filas);
-      });
+      Promise.all([listarClientes(db), listarPrestamosActivos(db)]).then(
+        ([filasClientes, filasPrestamos]) => {
+          if (!activo) return;
+          setClientes(filasClientes);
+          setPrestamos(filasPrestamos);
+        }
+      );
       return () => {
         activo = false;
       };
-    }, [db])
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [db, recarga])
   );
 
   const montoNum = leerEntero(monto);
@@ -100,6 +109,7 @@ export default function PrestamosScreen() {
     setFrecuencia('mensual');
     setFecha(formatearFecha(hoyISO()));
     setErrores({});
+    setRecarga((r) => r + 1);
     Alert.alert('Préstamo guardado');
   };
 
@@ -198,6 +208,30 @@ export default function PrestamosScreen() {
               <BotonGrande texto="Guardar préstamo" onPress={guardar} />
             </>
           )}
+
+          <ThemedText type="subtitle" style={styles.tituloLista}>
+            Préstamos activos
+          </ThemedText>
+          {prestamos.length === 0 ? (
+            <ThemedText style={styles.texto}>Todavía no hay préstamos activos</ThemedText>
+          ) : (
+            prestamos.map((prestamo) => (
+              <ThemedView key={prestamo.id} type="backgroundElement" style={styles.tarjeta}>
+                <ThemedText style={styles.nombre}>{prestamo.cliente_nombre}</ThemedText>
+                <ThemedText style={styles.texto}>
+                  Prestado: {formatearPesos(prestamo.monto)}
+                </ThemedText>
+                <ThemedText style={styles.texto}>
+                  Cuotas pagas: {prestamo.cuotas_pagadas} de {prestamo.cant_cuotas}
+                </ThemedText>
+                {prestamo.proximo_vencimiento ? (
+                  <ThemedText style={styles.texto}>
+                    Próximo vencimiento: {formatearFecha(prestamo.proximo_vencimiento)}
+                  </ThemedText>
+                ) : null}
+              </ThemedView>
+            ))
+          )}
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -239,6 +273,19 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     borderRadius: 12,
     gap: Spacing.one,
+  },
+  tituloLista: {
+    marginTop: Spacing.four,
+  },
+  tarjeta: {
+    padding: Spacing.three,
+    borderRadius: 12,
+    gap: Spacing.one,
+  },
+  nombre: {
+    fontSize: 24,
+    lineHeight: 32,
+    fontWeight: '700',
   },
   textoVistaPrevia: {
     fontSize: 24,

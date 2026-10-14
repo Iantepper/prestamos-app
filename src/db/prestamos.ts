@@ -31,3 +31,27 @@ export async function crearPrestamo(
 
   return prestamoId;
 }
+
+export type PrestamoActivo = {
+  id: number;
+  cliente_nombre: string;
+  monto: number;
+  cant_cuotas: number;
+  cuotas_pagadas: number;
+  proximo_vencimiento: string | null; // 'YYYY-MM-DD'; null si no quedan cuotas pendientes
+};
+
+// Préstamos activos con el avance de sus cuotas, primero los que vencen antes.
+export async function listarPrestamosActivos(db: SQLiteDatabase): Promise<PrestamoActivo[]> {
+  return db.getAllAsync<PrestamoActivo>(
+    `SELECT p.id, c.nombre AS cliente_nombre, p.monto, p.cant_cuotas,
+            (SELECT COUNT(*) FROM cuotas q
+              WHERE q.prestamo_id = p.id AND q.estado = 'pagada') AS cuotas_pagadas,
+            (SELECT MIN(q.fecha_vencimiento) FROM cuotas q
+              WHERE q.prestamo_id = p.id AND q.estado = 'pendiente') AS proximo_vencimiento
+       FROM prestamos p
+       JOIN clientes c ON c.id = p.cliente_id
+      WHERE p.estado = 'activo'
+      ORDER BY proximo_vencimiento, p.id`
+  );
+}
