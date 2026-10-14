@@ -1,6 +1,6 @@
-// Pantalla temporal de prueba de la base de datos (se reemplaza en la Fase 1).
+// Pantalla temporal de prueba de la base de datos (se reemplaza más adelante por la agenda).
 import { useSQLiteContext } from 'expo-sqlite';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -12,26 +12,31 @@ export default function HomeScreen() {
   const db = useSQLiteContext();
   const [tablas, setTablas] = useState<string[]>([]);
   const [cantClientes, setCantClientes] = useState(0);
-
-  const cargar = useCallback(async () => {
-    const t = await db.getAllAsync<{ name: string }>(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
-    );
-    setTablas(t.map((x) => x.name));
-    const c = await db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM clientes');
-    setCantClientes(c?.n ?? 0);
-  }, [db]);
+  const [recarga, setRecarga] = useState(0);
 
   useEffect(() => {
-    cargar();
-  }, [cargar]);
+    let activo = true;
+    Promise.all([
+      db.getAllAsync<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+      ),
+      db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM clientes'),
+    ]).then(([filasTablas, filaClientes]) => {
+      if (!activo) return;
+      setTablas(filasTablas.map((x) => x.name));
+      setCantClientes(filaClientes?.n ?? 0);
+    });
+    return () => {
+      activo = false;
+    };
+  }, [db, recarga]);
 
   const agregarPrueba = async () => {
     await db.runAsync('INSERT INTO clientes (nombre, direccion) VALUES (?, ?)', [
       'Cliente de prueba',
       'Obelisco, Buenos Aires',
     ]);
-    await cargar();
+    setRecarga((r) => r + 1);
   };
 
   return (
