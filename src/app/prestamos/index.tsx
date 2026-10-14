@@ -6,12 +6,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BotonGrande } from '@/components/boton-grande';
 import { CampoTexto } from '@/components/campo-texto';
+import { IndicadorRiesgo } from '@/components/indicador-riesgo';
 import { OpcionGrande } from '@/components/opcion-grande';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { listarClientes, type Cliente } from '@/db/clientes';
 import { crearPrestamo, listarPrestamos, type PrestamoListado } from '@/db/prestamos';
+import { obtenerPerfilesRiesgo } from '@/db/riesgo';
 import {
   calcularCuotas,
   totalADevolver,
@@ -27,6 +29,7 @@ import {
   leerFecha,
 } from '@/utils/formato';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
+import type { NivelRiesgo } from '@/utils/riesgo';
 
 const COLOR_ERROR = '#D32F2F';
 
@@ -58,6 +61,7 @@ export default function PrestamosScreen() {
   const [errores, setErrores] = useState<Errores>({});
 
   const [prestamos, setPrestamos] = useState<PrestamoListado[]>([]);
+  const [perfiles, setPerfiles] = useState<Map<number, NivelRiesgo>>(new Map());
   const [verSaldados, setVerSaldados] = useState(false);
   const [recarga, setRecarga] = useState(0);
 
@@ -66,11 +70,16 @@ export default function PrestamosScreen() {
   useFocusEffect(
     useCallback(() => {
       let activo = true;
-      Promise.all([listarClientes(db), listarPrestamos(db, verSaldados ? 'saldado' : 'activo')]).then(
-        ([filasClientes, filasPrestamos]) => {
+      Promise.all([
+        listarClientes(db),
+        listarPrestamos(db, verSaldados ? 'saldado' : 'activo'),
+        obtenerPerfilesRiesgo(db, hoyISO()),
+      ]).then(
+        ([filasClientes, filasPrestamos, perfilesClientes]) => {
           if (!activo) return;
           setClientes(filasClientes);
           setPrestamos(filasPrestamos);
+          setPerfiles(perfilesClientes);
         },
       );
       return () => {
@@ -156,9 +165,18 @@ export default function PrestamosScreen() {
                     texto={cliente.nombre}
                     detalle={cliente.direccion}
                     seleccionada={cliente.id === clienteId}
-                    onPress={() => setClienteId(cliente.id)}
-                  />
+                    onPress={() => setClienteId(cliente.id)}>
+                    <IndicadorRiesgo nivel={perfiles.get(cliente.id) ?? 'nuevo'} />
+                  </OpcionGrande>
                 ))}
+                {clienteId !== null && perfiles.get(clienteId) === 'riesgo' ? (
+                  <ThemedView style={styles.avisoRiesgo}>
+                    <ThemedText style={styles.textoAvisoRiesgo}>
+                      Atención: este cliente tiene cuotas muy atrasadas o muchos pagos fuera de
+                      término. Pensalo bien antes de prestarle.
+                    </ThemedText>
+                  </ThemedView>
+                ) : null}
                 {errores.cliente ? (
                   <ThemedText style={styles.error}>{errores.cliente}</ThemedText>
                 ) : null}
@@ -334,6 +352,18 @@ const styles = StyleSheet.create({
   },
   error: {
     color: COLOR_ERROR,
+  },
+  avisoRiesgo: {
+    padding: Spacing.three,
+    borderRadius: 12,
+    borderWidth: 3,
+    borderColor: COLOR_ERROR,
+  },
+  textoAvisoRiesgo: {
+    color: COLOR_ERROR,
+    fontSize: 20,
+    lineHeight: 28,
+    fontWeight: '700',
   },
   vistaPrevia: {
     padding: Spacing.three,

@@ -1,14 +1,19 @@
+import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BotonGrande } from '@/components/boton-grande';
 import { CampoTexto } from '@/components/campo-texto';
+import { IndicadorRiesgo } from '@/components/indicador-riesgo';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { crearCliente, listarClientes, type Cliente } from '@/db/clientes';
+import { obtenerPerfilesRiesgo } from '@/db/riesgo';
+import { hoyISO } from '@/utils/formato';
+import type { NivelRiesgo } from '@/utils/riesgo';
 
 type Errores = { nombre?: string; direccion?: string };
 
@@ -20,17 +25,26 @@ export default function ClientesScreen() {
   const [notas, setNotas] = useState('');
   const [errores, setErrores] = useState<Errores>({});
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [perfiles, setPerfiles] = useState<Map<number, NivelRiesgo>>(new Map());
   const [recarga, setRecarga] = useState(0);
 
-  useEffect(() => {
-    let activo = true;
-    listarClientes(db).then((filas) => {
-      if (activo) setClientes(filas);
-    });
-    return () => {
-      activo = false;
-    };
-  }, [db, recarga]);
+  // Se recarga al entrar a la pestaña (el perfil cambia con los pagos) y al guardar un cliente.
+  useFocusEffect(
+    useCallback(() => {
+      let activo = true;
+      Promise.all([listarClientes(db), obtenerPerfilesRiesgo(db, hoyISO())]).then(
+        ([filas, perfilesClientes]) => {
+          if (!activo) return;
+          setClientes(filas);
+          setPerfiles(perfilesClientes);
+        }
+      );
+      return () => {
+        activo = false;
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [db, recarga])
+  );
 
   const validar = (): boolean => {
     const nuevos: Errores = {};
@@ -109,6 +123,7 @@ export default function ClientesScreen() {
             clientes.map((cliente) => (
               <ThemedView key={cliente.id} type="backgroundElement" style={styles.tarjeta}>
                 <ThemedText style={styles.nombre}>{cliente.nombre}</ThemedText>
+                <IndicadorRiesgo nivel={perfiles.get(cliente.id) ?? 'nuevo'} />
                 {cliente.telefono ? (
                   <ThemedText style={styles.dato}>{cliente.telefono}</ThemedText>
                 ) : null}

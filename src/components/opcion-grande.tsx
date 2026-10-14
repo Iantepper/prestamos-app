@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -12,10 +13,11 @@ type Props = {
   seleccionada: boolean;
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
+  children?: ReactNode; // contenido extra debajo del texto
 };
 
 // Tarjeta grande para elegir una opción entre varias (cliente, frecuencia).
-export function OpcionGrande({ texto, detalle, seleccionada, onPress, style }: Props) {
+export function OpcionGrande({ texto, detalle, seleccionada, onPress, style, children }: Props) {
   const theme = useTheme();
 
   return (
@@ -33,6 +35,7 @@ export function OpcionGrande({ texto, detalle, seleccionada, onPress, style }: P
       ]}>
       <ThemedText style={styles.texto}>{texto}</ThemedText>
       {detalle ? <ThemedText style={styles.detalle}>{detalle}</ThemedText> : null}
+      {children}
     </Pressable>
   );
 }
