@@ -11,6 +11,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { listarClientes, type Cliente } from '@/db/clientes';
+import { crearPrestamo } from '@/db/prestamos';
 import { calcularCuotas, totalADevolver, type DatosPrestamo, type Frecuencia } from '@/utils/cuotas';
 import {
   formatearFecha,
@@ -84,13 +85,22 @@ export default function PrestamosScreen() {
     return Object.keys(nuevos).length === 0;
   };
 
-  const guardar = () => {
-    if (!validar() || !datos || !cuotasCalculadas) return;
-    // El guardado en la base llega en el próximo paso; por ahora solo confirmamos los datos.
-    Alert.alert(
-      'Datos del préstamo',
-      `${formatearPesos(datos.monto)} en ${datos.cantCuotas} cuotas de ${formatearPesos(cuotasCalculadas[0].monto)}`
-    );
+  const guardar = async () => {
+    if (!validar() || !datos || clienteId === null) return;
+    try {
+      await crearPrestamo(db, clienteId, datos);
+    } catch {
+      Alert.alert('No se pudo guardar', 'Probá de nuevo.');
+      return;
+    }
+    setClienteId(null);
+    setMonto('');
+    setTasa('');
+    setCuotas('');
+    setFrecuencia('mensual');
+    setFecha(formatearFecha(hoyISO()));
+    setErrores({});
+    Alert.alert('Préstamo guardado');
   };
 
   return (
