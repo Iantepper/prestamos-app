@@ -73,9 +73,16 @@ export default function DetallePrestamoScreen() {
       prestamo.mora_diaria_pct,
       hoy
     );
-    const recargo = Math.max(0, Math.round((mora.recargo - cuota.mora_pagada) * 100) / 100);
+    const recargo = Math.max(0, redondear(mora.recargo - cuota.mora_pagada));
     return { diasAtraso: mora.diasAtraso, recargo };
   };
+
+  // Saldo: lo cobrado y lo que falta de cada cuota (los recargos por mora se cuentan aparte).
+  const cobrado = redondear(cuotas.reduce((suma, q) => suma + q.monto_pagado, 0));
+  const faltaCobrar = redondear(
+    cuotas.reduce((suma, q) => suma + Math.max(0, q.monto - q.monto_pagado), 0)
+  );
+  const moraCobrada = redondear(cuotas.reduce((suma, q) => suma + q.mora_pagada, 0));
 
   const cobrar = async (cuota: Cuota, pago: { monto: number; mora: number }) => {
     try {
@@ -115,6 +122,18 @@ export default function DetallePrestamoScreen() {
               Recargo por mora: {prestamo.mora_diaria_pct} % por día
             </ThemedText>
           ) : null}
+        </ThemedView>
+
+        <ThemedView type="backgroundElement" style={styles.tarjeta}>
+          <ThemedText style={styles.texto}>Cobrado: {formatearPesos(cobrado)}</ThemedText>
+          {moraCobrada > 0 ? (
+            <ThemedText style={styles.texto}>
+              Recargos por mora cobrados: {formatearPesos(moraCobrada)}
+            </ThemedText>
+          ) : null}
+          <ThemedText style={styles.destacado}>
+            Falta cobrar: {formatearPesos(faltaCobrar)}
+          </ThemedText>
         </ThemedView>
 
         <ThemedText type="subtitle" style={styles.tituloLista}>
@@ -178,6 +197,10 @@ export default function DetallePrestamoScreen() {
       ) : null}
     </ThemedView>
   );
+}
+
+function redondear(valor: number): number {
+  return Math.round(valor * 100) / 100;
 }
 
 const styles = StyleSheet.create({

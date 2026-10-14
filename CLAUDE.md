@@ -25,7 +25,7 @@ Interés simple sobre el total: total = monto + monto × tasa%; cuota = total / 
 ## Plan por fases
 - Fase 0: entorno, proyecto Expo, SQLite. **Completa.**
 - Fase 1: clientes y préstamos. Pasos: (1) cálculo de cuotas ✔, (2) pantalla de alta de cliente ✔, (3) guardar clientes en la base ✔, (4) listado de clientes ✔, (5) pantalla de alta de préstamo ✔, (6) generar cuotas al crear préstamo ✔, (7) listado de préstamos activos ✔, (8) detalle del préstamo con sus cuotas ✔. **Completa.**
-- Fase 2: registrar pagos y calcular mora (% diario sobre cuota vencida), saldo pendiente.
+- Fase 2: registrar pagos y calcular mora (% diario sobre cuota vencida), saldo pendiente. **Completa.**
 - Fase 3: agenda de cobros por día; tocar un cobro abre Maps (`Linking.openURL` con `https://www.google.com/maps/search/?api=1&query=<dirección codificada>`); marcar como cobrado.
 - Fase 4: notificaciones locales (`expo-notifications`) y resumen (total prestado, por cobrar, atrasos).
 - Fase 5 (opcional): semáforo de riesgo por cliente según atrasos.
@@ -34,4 +34,5 @@ Interés simple sobre el total: total = monto + monto × tasa%; cuota = total / 
 ## Estado actual
 Pestañas: Inicio (`src/app/index.tsx`, pantalla temporal de prueba de la base), Clientes (`src/app/clientes.tsx`, formulario de alta y, debajo, listado de clientes; usa `crearCliente` y `listarClientes` de `src/db/clientes.ts`) y Préstamos (`src/app/prestamos/`, un Stack dentro de la pestaña: `index.tsx` con el formulario de alta y la lista de préstamos activos, `[id].tsx` con el detalle y sus cuotas; consultas en `src/db/prestamos.ts`). Formato de montos y fechas en `src/utils/formato.ts` (`formatearPesos`, `formatearFecha`); en los formularios las fechas se escriben como DD/MM/AAAA. Tarjetas para elegir opciones: `OpcionGrande` en `src/components/`. Repo en GitHub: Iantepper/prestamos-app, rama `main`.
 Si `npx tsc --noEmit` falla por una ruta nueva (`href` o `pathname` no asignable), reiniciar `npx expo start` para regenerar `.expo/types/router.d.ts`.
-**Próximo paso: Fase 2 (registrar pagos y calcular mora).** Al terminar cada paso, actualizar esta sección.
+Pagos (Fase 2): en el detalle del préstamo, tocar una cuota pendiente abre `CuadroCobro` (`src/components/cuadro-cobro.tsx`) y guarda con `registrarPago` de `src/db/pagos.ts`. Mora en `src/utils/mora.ts` (`calcularMora`): recargo simple = monto de la cuota × mora% diaria × días de atraso, menos lo ya cobrado de mora en esa cuota. Lo cobrado cubre primero el recargo y el resto va a la cuota: `pagos.mora` es la parte de recargo y `pagos.monto` la parte que se suma a `cuotas.monto_pagado`. La cuota queda pagada cuando `monto_pagado` cubre `monto`, y el préstamo pasa a `saldado` cuando no quedan cuotas pendientes. El saldo ("Cobrado" y "Falta cobrar") no incluye recargos por mora.
+**Próximo paso: Fase 3 (agenda de cobros por día).** Al terminar cada paso, actualizar esta sección.

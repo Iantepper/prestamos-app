@@ -259,6 +259,12 @@ export default function PrestamosScreen() {
                   <ThemedText style={styles.texto}>
                     Cuotas pagas: {prestamo.cuotas_pagadas} de {prestamo.cant_cuotas}
                   </ThemedText>
+                  <ThemedText style={styles.texto}>
+                    Cobrado: {formatearPesos(prestamo.cobrado)}
+                  </ThemedText>
+                  <ThemedText style={styles.texto}>
+                    Falta cobrar: {formatearPesos(prestamo.falta_cobrar)}
+                  </ThemedText>
                   {prestamo.proximo_vencimiento ? (
                     <ThemedText style={styles.texto}>
                       Próximo vencimiento: {formatearFecha(prestamo.proximo_vencimiento)}

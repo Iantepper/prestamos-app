@@ -48,6 +48,8 @@ export type PrestamoActivo = {
   monto: number;
   cant_cuotas: number;
   cuotas_pagadas: number;
+  cobrado: number; // suma de lo pagado de cada cuota (sin recargos por mora)
+  falta_cobrar: number; // suma de lo que falta de cada cuota
   proximo_vencimiento: string | null; // 'YYYY-MM-DD'; null si no quedan cuotas pendientes
 };
 
@@ -57,6 +59,10 @@ export async function listarPrestamosActivos(db: SQLiteDatabase): Promise<Presta
     `SELECT p.id, c.nombre AS cliente_nombre, p.monto, p.cant_cuotas,
             (SELECT COUNT(*) FROM cuotas q
               WHERE q.prestamo_id = p.id AND q.estado = 'pagada') AS cuotas_pagadas,
+            (SELECT COALESCE(SUM(q.monto_pagado), 0) FROM cuotas q
+              WHERE q.prestamo_id = p.id) AS cobrado,
+            (SELECT COALESCE(SUM(MAX(q.monto - q.monto_pagado, 0)), 0) FROM cuotas q
+              WHERE q.prestamo_id = p.id) AS falta_cobrar,
             (SELECT MIN(q.fecha_vencimiento) FROM cuotas q
               WHERE q.prestamo_id = p.id AND q.estado = 'pendiente') AS proximo_vencimiento
        FROM prestamos p
