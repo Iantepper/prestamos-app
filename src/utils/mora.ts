@@ -17,7 +17,7 @@ export function calcularMora(
 }
 
 // Días de calendario desde una fecha hasta otra (negativo si `hasta` es anterior).
-function diasEntre(desde: string, hasta: string): number {
+export function diasEntre(desde: string, hasta: string): number {
   const [a1, m1, d1] = desde.split('-').map(Number);
   const [a2, m2, d2] = hasta.split('-').map(Number);
   const MS_POR_DIA = 24 * 60 * 60 * 1000;

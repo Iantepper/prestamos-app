@@ -22,6 +22,14 @@ Tablas: `clientes` (nombre, telefono, direccion obligatoria, notas), `prestamos`
 ## Decisión de negocio: cálculo de cuotas (src/utils/cuotas.ts, ya creado)
 Interés simple sobre el total: total = monto + monto × tasa%; cuota = total / cantidad de cuotas, todas iguales (la última absorbe el redondeo). La primera cuota vence un período después de la fecha de inicio (semanal 7 días, quincenal 14, mensual 1 mes).
 
+## Decisión de negocio: perfil de riesgo del cliente (src/utils/riesgo.ts)
+Se calcula con todos los préstamos del cliente (`obtenerPerfilesRiesgo` en `src/db/riesgo.ts`). Pago tardío = un pago con fecha posterior al vencimiento de su cuota (se cuenta cada pago, también los parciales). Se evalúa en este orden:
+1. **Riesgo** (rojo): 3 o más pagos tardíos en los últimos 90 días, o alguna cuota vencida hace 15 días o más.
+2. **Con atrasos** (amarillo): 1 o 2 pagos tardíos en los últimos 90 días, o alguna cuota vencida hace menos de 15 días.
+3. **Nuevo** (gris): sin pagos registrados (y sin cuotas vencidas).
+4. **Cumplidor** (verde): el resto, es decir, tiene pagos, ninguno tardío en los últimos 90 días, y nada vencido.
+El indicador siempre muestra el texto además del color.
+
 ## Plan por fases
 - Fase 0: entorno, proyecto Expo, SQLite. **Completa.**
 - Fase 1: clientes y préstamos. Pasos: (1) cálculo de cuotas ✔, (2) pantalla de alta de cliente ✔, (3) guardar clientes en la base ✔, (4) listado de clientes ✔, (5) pantalla de alta de préstamo ✔, (6) generar cuotas al crear préstamo ✔, (7) listado de préstamos activos ✔, (8) detalle del préstamo con sus cuotas ✔. **Completa.**
