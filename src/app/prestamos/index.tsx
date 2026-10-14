@@ -41,6 +41,7 @@ type Errores = {
   tasa?: string;
   cuotas?: string;
   fecha?: string;
+  mora?: string;
 };
 
 export default function PrestamosScreen() {
@@ -52,6 +53,7 @@ export default function PrestamosScreen() {
   const [cuotas, setCuotas] = useState('');
   const [frecuencia, setFrecuencia] = useState<Frecuencia>('mensual');
   const [fecha, setFecha] = useState(() => formatearFecha(hoyISO()));
+  const [mora, setMora] = useState('0');
   const [errores, setErrores] = useState<Errores>({});
 
   const [prestamos, setPrestamos] = useState<PrestamoActivo[]>([]);
@@ -80,6 +82,8 @@ export default function PrestamosScreen() {
   const tasaNum = leerDecimal(tasa);
   const cuotasNum = leerEntero(cuotas);
   const fechaISO = leerFecha(fecha);
+  // El recargo por mora es opcional: vacío cuenta como 0.
+  const moraNum = mora.trim() ? leerDecimal(mora) : 0;
 
   // Datos listos para calcular, o null si todavía falta completar algo.
   const datos: DatosPrestamo | null =
@@ -101,6 +105,7 @@ export default function PrestamosScreen() {
     if (!(tasaNum >= 0)) nuevos.tasa = 'Escribí el interés (puede ser 0)';
     if (!(cuotasNum > 0)) nuevos.cuotas = 'Escribí una cantidad de cuotas mayor a 0';
     if (!fechaISO) nuevos.fecha = 'Escribí la fecha como día/mes/año. Ej: 05/11/2026';
+    if (!(moraNum >= 0)) nuevos.mora = 'Escribí un número, o dejalo en 0';
     setErrores(nuevos);
     return Object.keys(nuevos).length === 0;
   };
@@ -108,7 +113,7 @@ export default function PrestamosScreen() {
   const guardar = async () => {
     if (!validar() || !datos || clienteId === null) return;
     try {
-      await crearPrestamo(db, clienteId, datos);
+      await crearPrestamo(db, clienteId, datos, moraNum);
     } catch {
       Alert.alert('No se pudo guardar', 'Probá de nuevo.');
       return;
@@ -119,6 +124,7 @@ export default function PrestamosScreen() {
     setCuotas('');
     setFrecuencia('mensual');
     setFecha(formatearFecha(hoyISO()));
+    setMora('0');
     setErrores({});
     setRecarga((r) => r + 1);
     Alert.alert('Préstamo guardado');
@@ -202,6 +208,14 @@ export default function PrestamosScreen() {
                 error={errores.fecha}
                 keyboardType="numbers-and-punctuation"
                 placeholder="Ej: 05/11/2026"
+              />
+              <CampoTexto
+                etiqueta="Recargo por mora (% por día)"
+                value={mora}
+                onChangeText={setMora}
+                error={errores.mora}
+                keyboardType="decimal-pad"
+                placeholder="Ej: 1"
               />
 
               {datos && cuotasCalculadas ? (

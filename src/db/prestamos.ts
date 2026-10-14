@@ -8,16 +8,26 @@ import { calcularCuotas, type DatosPrestamo, type Frecuencia } from '@/utils/cuo
 export async function crearPrestamo(
   db: SQLiteDatabase,
   clienteId: number,
-  datos: DatosPrestamo
+  datos: DatosPrestamo,
+  moraDiariaPct = 0
 ): Promise<number> {
   const cuotas = calcularCuotas(datos);
   let prestamoId = 0;
 
   await db.withTransactionAsync(async () => {
     const resultado = await db.runAsync(
-      `INSERT INTO prestamos (cliente_id, monto, tasa_interes, cant_cuotas, frecuencia, fecha_inicio)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [clienteId, datos.monto, datos.tasaPct, datos.cantCuotas, datos.frecuencia, datos.fechaInicio]
+      `INSERT INTO prestamos
+         (cliente_id, monto, tasa_interes, cant_cuotas, frecuencia, fecha_inicio, mora_diaria_pct)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        clienteId,
+        datos.monto,
+        datos.tasaPct,
+        datos.cantCuotas,
+        datos.frecuencia,
+        datos.fechaInicio,
+        moraDiariaPct,
+      ]
     );
     prestamoId = resultado.lastInsertRowId;
 
