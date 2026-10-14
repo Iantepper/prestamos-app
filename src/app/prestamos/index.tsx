@@ -11,7 +11,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { listarClientes, type Cliente } from '@/db/clientes';
-import { crearPrestamo, listarPrestamosActivos, type PrestamoActivo } from '@/db/prestamos';
+import { crearPrestamo, listarPrestamos, type PrestamoListado } from '@/db/prestamos';
 import {
   calcularCuotas,
   totalADevolver,
@@ -56,15 +56,16 @@ export default function PrestamosScreen() {
   const [mora, setMora] = useState('0');
   const [errores, setErrores] = useState<Errores>({});
 
-  const [prestamos, setPrestamos] = useState<PrestamoActivo[]>([]);
+  const [prestamos, setPrestamos] = useState<PrestamoListado[]>([]);
+  const [verSaldados, setVerSaldados] = useState(false);
   const [recarga, setRecarga] = useState(0);
 
   // Se recarga cada vez que se entra a la pestaña (por si se cargó un cliente nuevo)
-  // y después de guardar un préstamo.
+  // y después de guardar un préstamo o cambiar entre activos y saldados.
   useFocusEffect(
     useCallback(() => {
       let activo = true;
-      Promise.all([listarClientes(db), listarPrestamosActivos(db)]).then(
+      Promise.all([listarClientes(db), listarPrestamos(db, verSaldados ? 'saldado' : 'activo')]).then(
         ([filasClientes, filasPrestamos]) => {
           if (!activo) return;
           setClientes(filasClientes);
@@ -75,7 +76,7 @@ export default function PrestamosScreen() {
         activo = false;
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [db, recarga]),
+    }, [db, recarga, verSaldados]),
   );
 
   const montoNum = leerEntero(monto);
@@ -235,10 +236,28 @@ export default function PrestamosScreen() {
           )}
 
           <ThemedText type="subtitle" style={styles.tituloLista}>
-            Préstamos activos
+            Préstamos
           </ThemedText>
+          <View style={styles.selector}>
+            <OpcionGrande
+              texto="Activos"
+              seleccionada={!verSaldados}
+              onPress={() => setVerSaldados(false)}
+              style={styles.opcionSelector}
+            />
+            <OpcionGrande
+              texto="Saldados"
+              seleccionada={verSaldados}
+              onPress={() => setVerSaldados(true)}
+              style={styles.opcionSelector}
+            />
+          </View>
           {prestamos.length === 0 ? (
-            <ThemedText style={styles.texto}>Todavía no hay préstamos activos</ThemedText>
+            <ThemedText style={styles.texto}>
+              {verSaldados
+                ? 'Todavía no hay préstamos saldados'
+                : 'Todavía no hay préstamos activos'}
+            </ThemedText>
           ) : (
             prestamos.map((prestamo) => (
               <Pressable
@@ -318,6 +337,14 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     borderRadius: 12,
     gap: Spacing.one,
+  },
+  selector: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  opcionSelector: {
+    flex: 1,
+    alignItems: 'center',
   },
   tituloLista: {
     marginTop: Spacing.four,

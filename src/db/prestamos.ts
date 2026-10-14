@@ -42,7 +42,7 @@ export async function crearPrestamo(
   return prestamoId;
 }
 
-export type PrestamoActivo = {
+export type PrestamoListado = {
   id: number;
   cliente_nombre: string;
   monto: number;
@@ -53,9 +53,13 @@ export type PrestamoActivo = {
   proximo_vencimiento: string | null; // 'YYYY-MM-DD'; null si no quedan cuotas pendientes
 };
 
-// Préstamos activos con el avance de sus cuotas, primero los que vencen antes.
-export async function listarPrestamosActivos(db: SQLiteDatabase): Promise<PrestamoActivo[]> {
-  return db.getAllAsync<PrestamoActivo>(
+// Préstamos activos o saldados con el avance de sus cuotas.
+// Primero los que vencen antes; los saldados, del más nuevo al más viejo.
+export async function listarPrestamos(
+  db: SQLiteDatabase,
+  estado: 'activo' | 'saldado'
+): Promise<PrestamoListado[]> {
+  return db.getAllAsync<PrestamoListado>(
     `SELECT p.id, c.nombre AS cliente_nombre, p.monto, p.cant_cuotas,
             (SELECT COUNT(*) FROM cuotas q
               WHERE q.prestamo_id = p.id AND q.estado = 'pagada') AS cuotas_pagadas,
@@ -67,8 +71,9 @@ export async function listarPrestamosActivos(db: SQLiteDatabase): Promise<Presta
               WHERE q.prestamo_id = p.id AND q.estado = 'pendiente') AS proximo_vencimiento
        FROM prestamos p
        JOIN clientes c ON c.id = p.cliente_id
-      WHERE p.estado = 'activo'
-      ORDER BY proximo_vencimiento, p.id`
+      WHERE p.estado = ?
+      ORDER BY proximo_vencimiento, p.id DESC`,
+    [estado]
   );
 }
 
