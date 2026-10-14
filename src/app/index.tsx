@@ -2,9 +2,10 @@
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BotonGrande } from '@/components/boton-grande';
 import { textoDias } from '@/components/cuadro-cobro';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -130,6 +131,12 @@ export default function AgendaScreen() {
                         {cobro.telefono ? (
                           <ThemedText style={styles.texto}>Tel: {cobro.telefono}</ThemedText>
                         ) : null}
+                        <View style={styles.botones}>
+                          <BotonGrande
+                            texto="Cómo llegar"
+                            onPress={() => abrirMapa(cobro.direccion)}
+                          />
+                        </View>
                       </ThemedView>
                     ))}
                   </View>
@@ -140,6 +147,16 @@ export default function AgendaScreen() {
       </SafeAreaView>
     </ThemedView>
   );
+}
+
+// Abre la app de mapas del celular buscando la dirección del cliente.
+async function abrirMapa(direccion: string) {
+  const consulta = encodeURIComponent(`${direccion}, Argentina`);
+  try {
+    await Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${consulta}`);
+  } catch {
+    Alert.alert('No se pudo abrir el mapa');
+  }
 }
 
 function sumar(cobros: Cobro[]): number {
@@ -177,6 +194,10 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: 'transparent',
     gap: Spacing.one,
+  },
+  botones: {
+    marginTop: Spacing.two,
+    gap: Spacing.two,
   },
   tarjetaVencida: {
     borderColor: COLOR_VENCIDA,
