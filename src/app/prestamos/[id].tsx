@@ -16,7 +16,7 @@ import {
 } from '@/db/prestamos';
 import { totalADevolver } from '@/utils/cuotas';
 import { formatearFecha, formatearPesos, hoyISO } from '@/utils/formato';
-import { calcularMora } from '@/utils/mora';
+import { calcularMoraPendiente } from '@/utils/mora';
 
 const COLOR_PAGADA = '#2E7D32';
 const COLOR_VENCIDA = '#D32F2F';
@@ -67,15 +67,16 @@ export default function DetallePrestamoScreen() {
   const hoy = hoyISO();
 
   // Días de atraso y recargo por mora que todavía falta cobrar de una cuota.
-  const moraDe = (cuota: Cuota) => {
-    const mora = calcularMora(
-      { monto: cuota.monto, fechaVencimiento: cuota.fecha_vencimiento },
+  const moraDe = (cuota: Cuota) =>
+    calcularMoraPendiente(
+      {
+        monto: cuota.monto,
+        fechaVencimiento: cuota.fecha_vencimiento,
+        moraPagada: cuota.mora_pagada,
+      },
       prestamo.mora_diaria_pct,
       hoy
     );
-    const recargo = Math.max(0, redondear(mora.recargo - cuota.mora_pagada));
-    return { diasAtraso: mora.diasAtraso, recargo };
-  };
 
   // Saldo: lo cobrado y lo que falta de cada cuota (los recargos por mora se cuentan aparte).
   const cobrado = redondear(cuotas.reduce((suma, q) => suma + q.monto_pagado, 0));

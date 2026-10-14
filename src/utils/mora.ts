@@ -23,3 +23,14 @@ function diasEntre(desde: string, hasta: string): number {
   const MS_POR_DIA = 24 * 60 * 60 * 1000;
   return Math.round((Date.UTC(a2, m2 - 1, d2) - Date.UTC(a1, m1 - 1, d1)) / MS_POR_DIA);
 }
+
+// Mora que todavía falta cobrar de una cuota: el recargo calculado menos lo ya cobrado de mora.
+export function calcularMoraPendiente(
+  cuota: { monto: number; fechaVencimiento: string; moraPagada: number },
+  moraDiariaPct: number,
+  hoy: string
+): Mora {
+  const mora = calcularMora(cuota, moraDiariaPct, hoy);
+  const recargo = Math.max(0, Math.round((mora.recargo - cuota.moraPagada) * 100) / 100);
+  return { diasAtraso: mora.diasAtraso, recargo };
+}

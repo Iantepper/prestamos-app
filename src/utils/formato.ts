@@ -62,3 +62,12 @@ export function leerMonto(texto: string): number {
 export function escribirMonto(valor: number): string {
   return Number.isInteger(valor) ? String(valor) : valor.toFixed(2).replace('.', ',');
 }
+
+// Suma días a una fecha 'YYYY-MM-DD'.
+export function sumarDias(fechaISO: string, dias: number): string {
+  const [anio, mes, dia] = fechaISO.split('-').map(Number);
+  const f = new Date(anio, mes - 1, dia + dias);
+  const mm = String(f.getMonth() + 1).padStart(2, '0');
+  const dd = String(f.getDate()).padStart(2, '0');
+  return `${f.getFullYear()}-${mm}-${dd}`;
+}
