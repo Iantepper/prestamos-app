@@ -27,6 +27,11 @@ export default function AppTabs() {
           renderingMode="template"
         />
       </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="prestamos">
+        <NativeTabs.Trigger.Label>Préstamos</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="banknote" md="payments" />
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
