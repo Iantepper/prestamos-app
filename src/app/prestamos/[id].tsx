@@ -1,20 +1,22 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 
+import { BotonGrande } from '@/components/boton-grande';
 import { CuadroCobro, textoDias } from '@/components/cuadro-cobro';
+import { CuadroEditarCuota } from '@/components/cuadro-editar-cuota';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { registrarPago } from '@/db/pagos';
 import {
+  actualizarCuota,
   listarCuotas,
   obtenerPrestamo,
   type Cuota,
   type PrestamoDetalle,
 } from '@/db/prestamos';
-import { totalADevolver } from '@/utils/cuotas';
 import { formatearFecha, formatearPesos, hoyISO } from '@/utils/formato';
 import { calcularMoraPendiente } from '@/utils/mora';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
@@ -37,6 +39,7 @@ export default function DetallePrestamoScreen() {
   const [cargando, setCargando] = useState(true);
   const [recarga, setRecarga] = useState(0);
   const [cuotaACobrar, setCuotaACobrar] = useState<Cuota | null>(null);
+  const [cuotaAEditar, setCuotaAEditar] = useState<Cuota | null>(null);
 
   useEffect(() => {
     let activo = true;
@@ -85,6 +88,24 @@ export default function DetallePrestamoScreen() {
     cuotas.reduce((suma, q) => suma + Math.max(0, q.monto - q.monto_pagado), 0)
   );
   const moraCobrada = redondear(cuotas.reduce((suma, q) => suma + q.mora_pagada, 0));
+  // Suma de las cuotas: coincide con monto + interés, salvo que se haya editado alguna cuota.
+  const totalADevolver = redondear(cuotas.reduce((suma, q) => suma + q.monto, 0));
+
+  const guardarCuota = async (
+    cuota: Cuota,
+    cambios: { fechaVencimiento: string; monto: number }
+  ) => {
+    try {
+      await actualizarCuota(db, cuota.id, cambios);
+    } catch {
+      Alert.alert('No se pudo guardar', 'Probá de nuevo.');
+      return;
+    }
+    setCuotaAEditar(null);
+    setRecarga((r) => r + 1);
+    reprogramarRecordatorios(db);
+    Alert.alert('Cuota actualizada');
+  };
 
   const cobrar = async (cuota: Cuota, pago: { monto: number; mora: number }) => {
     try {
@@ -111,8 +132,7 @@ export default function DetallePrestamoScreen() {
           <ThemedText style={styles.texto}>Prestado: {formatearPesos(prestamo.monto)}</ThemedText>
           <ThemedText style={styles.texto}>Interés: {prestamo.tasa_interes} %</ThemedText>
           <ThemedText style={styles.texto}>
-            Total a devolver:{' '}
-            {formatearPesos(totalADevolver(prestamo.monto, prestamo.tasa_interes))}
+            Total a devolver: {formatearPesos(totalADevolver)}
           </ThemedText>
           <ThemedText style={styles.texto}>
             {prestamo.cant_cuotas} cuotas, {TEXTO_FRECUENCIA[prestamo.frecuencia]}
@@ -147,42 +167,41 @@ export default function DetallePrestamoScreen() {
           const { diasAtraso } = moraDe(cuota);
           const vencida = !pagada && diasAtraso > 0;
           return (
-            <Pressable
+            <ThemedView
               key={cuota.id}
-              disabled={pagada}
-              accessibilityRole="button"
-              onPress={() => setCuotaACobrar(cuota)}
-              style={({ pressed }) => pressed && styles.presionado}>
-              <ThemedView
-                type="backgroundElement"
-                style={[styles.tarjeta, vencida && styles.tarjetaVencida]}>
-                <ThemedText style={styles.destacado}>
-                  Cuota {cuota.numero}: {formatearPesos(cuota.monto)}
-                </ThemedText>
+              type="backgroundElement"
+              style={[styles.tarjeta, vencida && styles.tarjetaVencida]}>
+              <ThemedText style={styles.destacado}>
+                Cuota {cuota.numero}: {formatearPesos(cuota.monto)}
+              </ThemedText>
+              <ThemedText style={styles.texto}>
+                Vence el {formatearFecha(cuota.fecha_vencimiento)}
+              </ThemedText>
+              {!pagada && cuota.monto_pagado > 0 ? (
                 <ThemedText style={styles.texto}>
-                  Vence el {formatearFecha(cuota.fecha_vencimiento)}
+                  Ya pagó: {formatearPesos(cuota.monto_pagado)}
                 </ThemedText>
-                {!pagada && cuota.monto_pagado > 0 ? (
-                  <ThemedText style={styles.texto}>
-                    Ya pagó: {formatearPesos(cuota.monto_pagado)}
-                  </ThemedText>
-                ) : null}
-                {pagada ? (
-                  <ThemedText style={[styles.texto, styles.pagada]}>Pagada</ThemedText>
-                ) : vencida ? (
-                  <ThemedText style={[styles.texto, styles.vencida]}>
-                    Vencida hace {textoDias(diasAtraso)}
-                  </ThemedText>
-                ) : (
-                  <ThemedText style={styles.texto}>Pendiente</ThemedText>
-                )}
-                {!pagada ? (
-                  <ThemedText style={styles.texto} themeColor="textSecondary">
-                    Tocá para cobrar
-                  </ThemedText>
-                ) : null}
-              </ThemedView>
-            </Pressable>
+              ) : null}
+              {pagada ? (
+                <ThemedText style={[styles.texto, styles.pagada]}>Pagada</ThemedText>
+              ) : vencida ? (
+                <ThemedText style={[styles.texto, styles.vencida]}>
+                  Vencida hace {textoDias(diasAtraso)}
+                </ThemedText>
+              ) : (
+                <ThemedText style={styles.texto}>Pendiente</ThemedText>
+              )}
+              {!pagada ? (
+                <View style={styles.botones}>
+                  <BotonGrande texto="Cobrar" onPress={() => setCuotaACobrar(cuota)} />
+                  <BotonGrande
+                    texto="Editar"
+                    variante="secundario"
+                    onPress={() => setCuotaAEditar(cuota)}
+                  />
+                </View>
+              ) : null}
+            </ThemedView>
           );
         })}
       </ScrollView>
@@ -197,6 +216,17 @@ export default function DetallePrestamoScreen() {
           recargo={moraDe(cuotaACobrar).recargo}
           onConfirmar={(pago) => cobrar(cuotaACobrar, pago)}
           onCancelar={() => setCuotaACobrar(null)}
+        />
+      ) : null}
+
+      {cuotaAEditar ? (
+        <CuadroEditarCuota
+          numeroCuota={cuotaAEditar.numero}
+          fechaVencimiento={cuotaAEditar.fecha_vencimiento}
+          monto={cuotaAEditar.monto}
+          montoPagado={cuotaAEditar.monto_pagado}
+          onGuardar={(cambios) => guardarCuota(cuotaAEditar, cambios)}
+          onCancelar={() => setCuotaAEditar(null)}
         />
       ) : null}
     </ThemedView>
@@ -235,8 +265,9 @@ const styles = StyleSheet.create({
   tarjetaVencida: {
     borderColor: COLOR_VENCIDA,
   },
-  presionado: {
-    opacity: 0.7,
+  botones: {
+    marginTop: Spacing.two,
+    gap: Spacing.two,
   },
   texto: {
     fontSize: 20,

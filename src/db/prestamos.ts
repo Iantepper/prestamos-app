@@ -124,3 +124,15 @@ export async function listarCuotas(db: SQLiteDatabase, prestamoId: number): Prom
     [prestamoId]
   );
 }
+
+// Cambia la fecha de vencimiento y el monto de una cuota. Las cuotas pagadas no se modifican.
+export async function actualizarCuota(
+  db: SQLiteDatabase,
+  cuotaId: number,
+  cambios: { fechaVencimiento: string; monto: number }
+): Promise<void> {
+  await db.runAsync(
+    `UPDATE cuotas SET fecha_vencimiento = ?, monto = ? WHERE id = ? AND estado = 'pendiente'`,
+    [cambios.fechaVencimiento, cambios.monto, cuotaId]
+  );
+}
