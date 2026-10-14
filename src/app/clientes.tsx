@@ -1,3 +1,4 @@
+import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,10 +8,12 @@ import { CampoTexto } from '@/components/campo-texto';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { crearCliente } from '@/db/clientes';
 
 type Errores = { nombre?: string; direccion?: string };
 
 export default function ClientesScreen() {
+  const db = useSQLiteContext();
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [direccion, setDireccion] = useState('');
@@ -25,10 +28,20 @@ export default function ClientesScreen() {
     return Object.keys(nuevos).length === 0;
   };
 
-  const guardar = () => {
+  const guardar = async () => {
     if (!validar()) return;
-    // El guardado en la base llega en el próximo paso; por ahora solo confirmamos los datos.
-    Alert.alert('Datos del cliente', `${nombre.trim()}\n${direccion.trim()}`);
+    try {
+      await crearCliente(db, { nombre, telefono, direccion, notas });
+    } catch {
+      Alert.alert('No se pudo guardar', 'Probá de nuevo.');
+      return;
+    }
+    setNombre('');
+    setTelefono('');
+    setDireccion('');
+    setNotas('');
+    setErrores({});
+    Alert.alert('Cliente guardado');
   };
 
   return (
