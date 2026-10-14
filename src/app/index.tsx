@@ -167,6 +167,7 @@ export default function AgendaScreen() {
       {cobroACobrar ? (
         <CuadroCobro
           numeroCuota={cobroACobrar.numero}
+          cliente={cobroACobrar.cliente_nombre}
           montoCuota={cobroACobrar.monto}
           montoPagado={cobroACobrar.monto_pagado}
           diasAtraso={cobroACobrar.diasAtraso}

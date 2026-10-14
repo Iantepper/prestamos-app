@@ -11,6 +11,7 @@ import { escribirMonto, formatearPesos, leerMonto } from '@/utils/formato';
 
 type Props = {
   numeroCuota: number;
+  cliente: string;
   montoCuota: number;
   montoPagado: number;
   diasAtraso: number;
@@ -23,6 +24,7 @@ type Props = {
 // Cuadro para cobrar una cuota: muestra el total y deja cambiarlo si el cliente paga una parte.
 export function CuadroCobro({
   numeroCuota,
+  cliente,
   montoCuota,
   montoPagado,
   diasAtraso,
@@ -57,7 +59,9 @@ export function CuadroCobro({
             contentContainerStyle={styles.contenido}
             keyboardShouldPersistTaps="handled"
             automaticallyAdjustKeyboardInsets>
-            <ThemedText type="subtitle">Cobrar cuota {numeroCuota}</ThemedText>
+            <ThemedText type="subtitle">
+              Cobrar cuota {numeroCuota} a {cliente}
+            </ThemedText>
 
             <ThemedView type="backgroundElement" style={styles.tarjeta}>
               <ThemedText style={styles.texto}>

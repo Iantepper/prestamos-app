@@ -188,6 +188,7 @@ export default function DetallePrestamoScreen() {
       {cuotaACobrar ? (
         <CuadroCobro
           numeroCuota={cuotaACobrar.numero}
+          cliente={prestamo.cliente_nombre}
           montoCuota={cuotaACobrar.monto}
           montoPagado={cuotaACobrar.monto_pagado}
           diasAtraso={moraDe(cuotaACobrar).diasAtraso}
