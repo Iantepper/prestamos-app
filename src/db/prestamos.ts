@@ -2,7 +2,7 @@
 // Consultas de las tablas prestamos y cuotas.
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-import { calcularCuotas, type DatosPrestamo } from '@/utils/cuotas';
+import { calcularCuotas, type DatosPrestamo, type Frecuencia } from '@/utils/cuotas';
 
 // Guarda el préstamo y todas sus cuotas en una sola transacción. Devuelve el id del préstamo.
 export async function crearPrestamo(
@@ -53,5 +53,48 @@ export async function listarPrestamosActivos(db: SQLiteDatabase): Promise<Presta
        JOIN clientes c ON c.id = p.cliente_id
       WHERE p.estado = 'activo'
       ORDER BY proximo_vencimiento, p.id`
+  );
+}
+
+export type PrestamoDetalle = {
+  id: number;
+  cliente_nombre: string;
+  monto: number;
+  tasa_interes: number;
+  cant_cuotas: number;
+  frecuencia: Frecuencia;
+  fecha_inicio: string; // 'YYYY-MM-DD'
+};
+
+export type Cuota = {
+  id: number;
+  numero: number;
+  fecha_vencimiento: string; // 'YYYY-MM-DD'
+  monto: number;
+  estado: 'pendiente' | 'pagada';
+};
+
+// Datos de un préstamo con el nombre de su cliente, o null si no existe.
+export async function obtenerPrestamo(
+  db: SQLiteDatabase,
+  prestamoId: number
+): Promise<PrestamoDetalle | null> {
+  return db.getFirstAsync<PrestamoDetalle>(
+    `SELECT p.id, c.nombre AS cliente_nombre, p.monto, p.tasa_interes, p.cant_cuotas,
+            p.frecuencia, p.fecha_inicio
+       FROM prestamos p
+       JOIN clientes c ON c.id = p.cliente_id
+      WHERE p.id = ?`,
+    [prestamoId]
+  );
+}
+
+export async function listarCuotas(db: SQLiteDatabase, prestamoId: number): Promise<Cuota[]> {
+  return db.getAllAsync<Cuota>(
+    `SELECT id, numero, fecha_vencimiento, monto, estado
+       FROM cuotas
+      WHERE prestamo_id = ?
+      ORDER BY numero`,
+    [prestamoId]
   );
 }

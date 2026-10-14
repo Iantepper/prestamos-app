@@ -1,7 +1,7 @@
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BotonGrande } from '@/components/boton-grande';
@@ -12,7 +12,12 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { listarClientes, type Cliente } from '@/db/clientes';
 import { crearPrestamo, listarPrestamosActivos, type PrestamoActivo } from '@/db/prestamos';
-import { calcularCuotas, totalADevolver, type DatosPrestamo, type Frecuencia } from '@/utils/cuotas';
+import {
+  calcularCuotas,
+  totalADevolver,
+  type DatosPrestamo,
+  type Frecuencia,
+} from '@/utils/cuotas';
 import {
   formatearFecha,
   formatearPesos,
@@ -62,13 +67,13 @@ export default function PrestamosScreen() {
           if (!activo) return;
           setClientes(filasClientes);
           setPrestamos(filasPrestamos);
-        }
+        },
       );
       return () => {
         activo = false;
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [db, recarga])
+    }, [db, recarga]),
   );
 
   const montoNum = leerEntero(monto);
@@ -79,7 +84,13 @@ export default function PrestamosScreen() {
   // Datos listos para calcular, o null si todavía falta completar algo.
   const datos: DatosPrestamo | null =
     montoNum > 0 && tasaNum >= 0 && cuotasNum > 0 && fechaISO
-      ? { monto: montoNum, tasaPct: tasaNum, cantCuotas: cuotasNum, frecuencia, fechaInicio: fechaISO }
+      ? {
+          monto: montoNum,
+          tasaPct: tasaNum,
+          cantCuotas: cuotasNum,
+          frecuencia,
+          fechaInicio: fechaISO,
+        }
       : null;
   const cuotasCalculadas = datos ? calcularCuotas(datos) : null;
 
@@ -216,20 +227,34 @@ export default function PrestamosScreen() {
             <ThemedText style={styles.texto}>Todavía no hay préstamos activos</ThemedText>
           ) : (
             prestamos.map((prestamo) => (
-              <ThemedView key={prestamo.id} type="backgroundElement" style={styles.tarjeta}>
-                <ThemedText style={styles.nombre}>{prestamo.cliente_nombre}</ThemedText>
-                <ThemedText style={styles.texto}>
-                  Prestado: {formatearPesos(prestamo.monto)}
-                </ThemedText>
-                <ThemedText style={styles.texto}>
-                  Cuotas pagas: {prestamo.cuotas_pagadas} de {prestamo.cant_cuotas}
-                </ThemedText>
-                {prestamo.proximo_vencimiento ? (
+              <Pressable
+                key={prestamo.id}
+                accessibilityRole="button"
+                onPress={() =>
+                  router.push({
+                    pathname: '/prestamos/[id]',
+                    params: { id: prestamo.id },
+                  })
+                }
+                style={({ pressed }) => pressed && styles.presionado}>
+                <ThemedView type="backgroundElement" style={styles.tarjeta}>
+                  <ThemedText style={styles.nombre}>{prestamo.cliente_nombre}</ThemedText>
                   <ThemedText style={styles.texto}>
-                    Próximo vencimiento: {formatearFecha(prestamo.proximo_vencimiento)}
+                    Prestado: {formatearPesos(prestamo.monto)}
                   </ThemedText>
-                ) : null}
-              </ThemedView>
+                  <ThemedText style={styles.texto}>
+                    Cuotas pagas: {prestamo.cuotas_pagadas} de {prestamo.cant_cuotas}
+                  </ThemedText>
+                  {prestamo.proximo_vencimiento ? (
+                    <ThemedText style={styles.texto}>
+                      Próximo vencimiento: {formatearFecha(prestamo.proximo_vencimiento)}
+                    </ThemedText>
+                  ) : null}
+                  <ThemedText style={styles.ayuda} themeColor="textSecondary">
+                    Tocá para ver las cuotas
+                  </ThemedText>
+                </ThemedView>
+              </Pressable>
             ))
           )}
         </ScrollView>
@@ -286,6 +311,13 @@ const styles = StyleSheet.create({
     fontSize: 24,
     lineHeight: 32,
     fontWeight: '700',
+  },
+  presionado: {
+    opacity: 0.7,
+  },
+  ayuda: {
+    fontSize: 20,
+    lineHeight: 28,
   },
   textoVistaPrevia: {
     fontSize: 24,
