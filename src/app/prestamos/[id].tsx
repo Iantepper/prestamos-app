@@ -17,6 +17,7 @@ import {
 import { totalADevolver } from '@/utils/cuotas';
 import { formatearFecha, formatearPesos, hoyISO } from '@/utils/formato';
 import { calcularMoraPendiente } from '@/utils/mora';
+import { reprogramarRecordatorios } from '@/utils/recordatorios';
 
 const COLOR_PAGADA = '#2E7D32';
 const COLOR_VENCIDA = '#D32F2F';
@@ -94,6 +95,7 @@ export default function DetallePrestamoScreen() {
     }
     setCuotaACobrar(null);
     setRecarga((r) => r + 1);
+    reprogramarRecordatorios(db);
     Alert.alert('Pago registrado');
   };
 

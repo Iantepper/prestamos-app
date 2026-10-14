@@ -26,6 +26,7 @@ import {
   leerEntero,
   leerFecha,
 } from '@/utils/formato';
+import { reprogramarRecordatorios } from '@/utils/recordatorios';
 
 const COLOR_ERROR = '#D32F2F';
 
@@ -128,6 +129,7 @@ export default function PrestamosScreen() {
     setMora('0');
     setErrores({});
     setRecarga((r) => r + 1);
+    reprogramarRecordatorios(db);
     Alert.alert('Préstamo guardado');
   };
 

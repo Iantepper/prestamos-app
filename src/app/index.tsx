@@ -14,6 +14,7 @@ import { listarCobrosPendientes, type CobroPendiente } from '@/db/agenda';
 import { registrarPago } from '@/db/pagos';
 import { formatearFecha, formatearPesos, hoyISO, sumarDias } from '@/utils/formato';
 import { calcularMoraPendiente } from '@/utils/mora';
+import { reprogramarRecordatorios } from '@/utils/recordatorios';
 
 const COLOR_VENCIDA = '#D32F2F';
 
@@ -91,6 +92,7 @@ export default function AgendaScreen() {
     }
     setCobroACobrar(null);
     setRecarga((r) => r + 1);
+    reprogramarRecordatorios(db);
     Alert.alert('Pago registrado');
   };
 

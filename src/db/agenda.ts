@@ -32,3 +32,28 @@ export async function listarCobrosPendientes(
     [hasta]
   );
 }
+
+export type CobrosDelDia = {
+  fecha: string; // 'YYYY-MM-DD'
+  cantidad: number;
+  monto: number; // lo que falta de las cuotas que vencen ese día (sin mora)
+};
+
+// Cantidad y monto de cuotas pendientes que vencen cada día entre dos fechas (inclusive).
+export async function resumirCobrosPorDia(
+  db: SQLiteDatabase,
+  desde: string,
+  hasta: string
+): Promise<CobrosDelDia[]> {
+  return db.getAllAsync<CobrosDelDia>(
+    `SELECT q.fecha_vencimiento AS fecha, COUNT(*) AS cantidad,
+            ROUND(SUM(q.monto - q.monto_pagado), 2) AS monto
+       FROM cuotas q
+       JOIN prestamos p ON p.id = q.prestamo_id
+      WHERE q.estado = 'pendiente' AND p.estado = 'activo'
+        AND q.fecha_vencimiento BETWEEN ? AND ?
+      GROUP BY q.fecha_vencimiento
+      ORDER BY q.fecha_vencimiento`,
+    [desde, hasta]
+  );
+}
