@@ -1,5 +1,5 @@
 import { useSQLiteContext } from 'expo-sqlite';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,7 +8,7 @@ import { CampoTexto } from '@/components/campo-texto';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { crearCliente } from '@/db/clientes';
+import { crearCliente, listarClientes, type Cliente } from '@/db/clientes';
 
 type Errores = { nombre?: string; direccion?: string };
 
@@ -19,6 +19,18 @@ export default function ClientesScreen() {
   const [direccion, setDireccion] = useState('');
   const [notas, setNotas] = useState('');
   const [errores, setErrores] = useState<Errores>({});
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [recarga, setRecarga] = useState(0);
+
+  useEffect(() => {
+    let activo = true;
+    listarClientes(db).then((filas) => {
+      if (activo) setClientes(filas);
+    });
+    return () => {
+      activo = false;
+    };
+  }, [db, recarga]);
 
   const validar = (): boolean => {
     const nuevos: Errores = {};
@@ -41,6 +53,7 @@ export default function ClientesScreen() {
     setDireccion('');
     setNotas('');
     setErrores({});
+    setRecarga((r) => r + 1);
     Alert.alert('Cliente guardado');
   };
 
@@ -86,6 +99,23 @@ export default function ClientesScreen() {
           />
 
           <BotonGrande texto="Guardar cliente" onPress={guardar} />
+
+          <ThemedText type="subtitle" style={styles.tituloLista}>
+            Clientes guardados
+          </ThemedText>
+          {clientes.length === 0 ? (
+            <ThemedText style={styles.dato}>Todavía no cargaste clientes</ThemedText>
+          ) : (
+            clientes.map((cliente) => (
+              <ThemedView key={cliente.id} type="backgroundElement" style={styles.tarjeta}>
+                <ThemedText style={styles.nombre}>{cliente.nombre}</ThemedText>
+                {cliente.telefono ? (
+                  <ThemedText style={styles.dato}>{cliente.telefono}</ThemedText>
+                ) : null}
+                <ThemedText style={styles.dato}>{cliente.direccion}</ThemedText>
+              </ThemedView>
+            ))
+          )}
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -110,5 +140,22 @@ const styles = StyleSheet.create({
   notas: {
     minHeight: 96,
     textAlignVertical: 'top',
+  },
+  tituloLista: {
+    marginTop: Spacing.four,
+  },
+  tarjeta: {
+    padding: Spacing.three,
+    borderRadius: 12,
+    gap: Spacing.one,
+  },
+  nombre: {
+    fontSize: 24,
+    lineHeight: 32,
+    fontWeight: '700',
+  },
+  dato: {
+    fontSize: 20,
+    lineHeight: 28,
   },
 });

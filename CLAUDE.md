@@ -24,7 +24,7 @@ Interés simple sobre el total: total = monto + monto × tasa%; cuota = total / 
 
 ## Plan por fases
 - Fase 0: entorno, proyecto Expo, SQLite. **Completa.**
-- Fase 1: clientes y préstamos. Pasos: (1) cálculo de cuotas ✔, (2) pantalla de alta de cliente ✔, (3) guardar clientes en la base ✔, (4) listado de clientes, (5) pantalla de alta de préstamo, (6) generar cuotas al crear préstamo, (7) listado de préstamos activos, (8) detalle del préstamo con sus cuotas.
+- Fase 1: clientes y préstamos. Pasos: (1) cálculo de cuotas ✔, (2) pantalla de alta de cliente ✔, (3) guardar clientes en la base ✔, (4) listado de clientes ✔, (5) pantalla de alta de préstamo, (6) generar cuotas al crear préstamo, (7) listado de préstamos activos, (8) detalle del préstamo con sus cuotas.
 - Fase 2: registrar pagos y calcular mora (% diario sobre cuota vencida), saldo pendiente.
 - Fase 3: agenda de cobros por día; tocar un cobro abre Maps (`Linking.openURL` con `https://www.google.com/maps/search/?api=1&query=<dirección codificada>`); marcar como cobrado.
 - Fase 4: notificaciones locales (`expo-notifications`) y resumen (total prestado, por cobrar, atrasos).
@@ -32,5 +32,5 @@ Interés simple sobre el total: total = monto + monto × tasa%; cuota = total / 
 - Fase 6: pulido de usabilidad y demo.
 
 ## Estado actual
-Pestañas: Inicio (`src/app/index.tsx`, pantalla temporal de prueba de la base) y Clientes (`src/app/clientes.tsx`, formulario de alta que guarda con `crearCliente` de `src/db/clientes.ts`). Repo en GitHub: Iantepper/prestamos-app, rama `main`.
-**Próximo paso: Fase 1, paso 4 (listado de clientes).** Al terminar cada paso, actualizar esta sección.
+Pestañas: Inicio (`src/app/index.tsx`, pantalla temporal de prueba de la base) y Clientes (`src/app/clientes.tsx`, formulario de alta y, debajo, listado de clientes; usa `crearCliente` y `listarClientes` de `src/db/clientes.ts`). Repo en GitHub: Iantepper/prestamos-app, rama `main`.
+**Próximo paso: Fase 1, paso 5 (pantalla de alta de préstamo).** Al terminar cada paso, actualizar esta sección.

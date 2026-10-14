@@ -22,3 +22,18 @@ export async function crearCliente(db: SQLiteDatabase, cliente: ClienteNuevo): P
   );
   return resultado.lastInsertRowId;
 }
+
+export type Cliente = {
+  id: number;
+  nombre: string;
+  telefono: string | null;
+  direccion: string;
+  notas: string | null;
+};
+
+// Devuelve todos los clientes ordenados por nombre.
+export async function listarClientes(db: SQLiteDatabase): Promise<Cliente[]> {
+  return db.getAllAsync<Cliente>(
+    'SELECT id, nombre, telefono, direccion, notas FROM clientes ORDER BY nombre COLLATE NOCASE'
+  );
+}
