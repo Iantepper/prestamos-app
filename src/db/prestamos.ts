@@ -74,6 +74,8 @@ export type PrestamoDetalle = {
   cant_cuotas: number;
   frecuencia: Frecuencia;
   fecha_inicio: string; // 'YYYY-MM-DD'
+  mora_diaria_pct: number;
+  estado: 'activo' | 'saldado';
 };
 
 export type Cuota = {
@@ -81,6 +83,8 @@ export type Cuota = {
   numero: number;
   fecha_vencimiento: string; // 'YYYY-MM-DD'
   monto: number;
+  monto_pagado: number;
+  mora_pagada: number; // recargos por mora ya cobrados de esta cuota
   estado: 'pendiente' | 'pagada';
 };
 
@@ -91,7 +95,7 @@ export async function obtenerPrestamo(
 ): Promise<PrestamoDetalle | null> {
   return db.getFirstAsync<PrestamoDetalle>(
     `SELECT p.id, c.nombre AS cliente_nombre, p.monto, p.tasa_interes, p.cant_cuotas,
-            p.frecuencia, p.fecha_inicio
+            p.frecuencia, p.fecha_inicio, p.mora_diaria_pct, p.estado
        FROM prestamos p
        JOIN clientes c ON c.id = p.cliente_id
       WHERE p.id = ?`,
@@ -101,9 +105,10 @@ export async function obtenerPrestamo(
 
 export async function listarCuotas(db: SQLiteDatabase, prestamoId: number): Promise<Cuota[]> {
   return db.getAllAsync<Cuota>(
-    `SELECT id, numero, fecha_vencimiento, monto, estado
-       FROM cuotas
-      WHERE prestamo_id = ?
+    `SELECT q.id, q.numero, q.fecha_vencimiento, q.monto, q.monto_pagado, q.estado,
+            (SELECT COALESCE(SUM(g.mora), 0) FROM pagos g WHERE g.cuota_id = q.id) AS mora_pagada
+       FROM cuotas q
+      WHERE q.prestamo_id = ?
       ORDER BY numero`,
     [prestamoId]
   );

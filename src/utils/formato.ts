@@ -47,3 +47,18 @@ export function leerDecimal(texto: string): number {
   const limpio = texto.trim().replace(',', '.');
   return /^\d+(\.\d+)?$/.test(limpio) ? Number(limpio) : NaN;
 }
+
+// Monto en pesos escrito por el usuario: acepta "10500", "10.500", "3333,33" o "3333.33".
+// NaN si no es válido.
+export function leerMonto(texto: string): number {
+  const limpio = texto.replace(/[\s$]/g, '');
+  if (/^\d{1,3}(\.\d{3})+(,\d{1,2})?$/.test(limpio)) {
+    return Number(limpio.replace(/\./g, '').replace(',', '.'));
+  }
+  return /^\d+([.,]\d{1,2})?$/.test(limpio) ? Number(limpio.replace(',', '.')) : NaN;
+}
+
+// Monto para precargar en un campo de texto: "10500" o "3333,33".
+export function escribirMonto(valor: number): string {
+  return Number.isInteger(valor) ? String(valor) : valor.toFixed(2).replace('.', ',');
+}
