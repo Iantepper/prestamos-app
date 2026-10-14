@@ -6,18 +6,19 @@ import { Alert, Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BotonGrande } from '@/components/boton-grande';
-import { textoDias } from '@/components/cuadro-cobro';
+import { CuadroCobro, textoDias } from '@/components/cuadro-cobro';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { listarCobrosPendientes, type CobroPendiente } from '@/db/agenda';
+import { registrarPago } from '@/db/pagos';
 import { formatearFecha, formatearPesos, hoyISO, sumarDias } from '@/utils/formato';
 import { calcularMoraPendiente } from '@/utils/mora';
 
 const COLOR_VENCIDA = '#D32F2F';
 
 // Un cobro con lo que hay que cobrar hoy: lo que falta de la cuota más la mora si está vencida.
-type Cobro = CobroPendiente & { diasAtraso: number; aCobrar: number };
+type Cobro = CobroPendiente & { diasAtraso: number; recargo: number; aCobrar: number };
 
 type Grupo = { titulo: string; atrasadas: boolean; cobros: Cobro[] };
 
@@ -25,8 +26,11 @@ export default function AgendaScreen() {
   const db = useSQLiteContext();
   const [filas, setFilas] = useState<CobroPendiente[]>([]);
   const [hoy, setHoy] = useState(hoyISO);
+  const [recarga, setRecarga] = useState(0);
+  const [cobroACobrar, setCobroACobrar] = useState<Cobro | null>(null);
 
-  // Se recarga cada vez que se entra a la pestaña (por si se cargó un préstamo o un pago).
+  // Se recarga cada vez que se entra a la pestaña (por si se cargó un préstamo o un pago)
+  // y después de cobrar desde acá.
   useFocusEffect(
     useCallback(() => {
       let activo = true;
@@ -39,7 +43,8 @@ export default function AgendaScreen() {
       return () => {
         activo = false;
       };
-    }, [db])
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [db, recarga])
   );
 
   const manana = sumarDias(hoy, 1);
@@ -54,7 +59,7 @@ export default function AgendaScreen() {
       hoy
     );
     const aCobrar = Math.round((fila.monto - fila.monto_pagado + recargo) * 100) / 100;
-    return { ...fila, diasAtraso, aCobrar };
+    return { ...fila, diasAtraso, recargo, aCobrar };
   });
 
   const grupos: Grupo[] = [
@@ -76,6 +81,18 @@ export default function AgendaScreen() {
     },
   ];
   const [atrasadas, deHoy] = grupos;
+
+  const cobrar = async (cobro: Cobro, pago: { monto: number; mora: number }) => {
+    try {
+      await registrarPago(db, { cuotaId: cobro.cuota_id, fecha: hoyISO(), ...pago });
+    } catch {
+      Alert.alert('No se pudo guardar', 'Probá de nuevo.');
+      return;
+    }
+    setCobroACobrar(null);
+    setRecarga((r) => r + 1);
+    Alert.alert('Pago registrado');
+  };
 
   return (
     <ThemedView style={styles.container}>
@@ -136,6 +153,7 @@ export default function AgendaScreen() {
                             texto="Cómo llegar"
                             onPress={() => abrirMapa(cobro.direccion)}
                           />
+                          <BotonGrande texto="Cobrar" onPress={() => setCobroACobrar(cobro)} />
                         </View>
                       </ThemedView>
                     ))}
@@ -145,6 +163,18 @@ export default function AgendaScreen() {
           )}
         </ScrollView>
       </SafeAreaView>
+
+      {cobroACobrar ? (
+        <CuadroCobro
+          numeroCuota={cobroACobrar.numero}
+          montoCuota={cobroACobrar.monto}
+          montoPagado={cobroACobrar.monto_pagado}
+          diasAtraso={cobroACobrar.diasAtraso}
+          recargo={cobroACobrar.recargo}
+          onConfirmar={(pago) => cobrar(cobroACobrar, pago)}
+          onCancelar={() => setCobroACobrar(null)}
+        />
+      ) : null}
     </ThemedView>
   );
 }
