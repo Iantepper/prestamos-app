@@ -136,3 +136,23 @@ export async function actualizarCuota(
     [cambios.fechaVencimiento, cambios.monto, cuotaId]
   );
 }
+
+// Borra un préstamo y sus cuotas, solo si no tiene pagos registrados.
+// Devuelve false (y no borra nada) si tiene pagos.
+export async function eliminarPrestamoSinPagos(
+  db: SQLiteDatabase,
+  prestamoId: number
+): Promise<boolean> {
+  let eliminado = false;
+  await db.withTransactionAsync(async () => {
+    const fila = await db.getFirstAsync<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM pagos g JOIN cuotas q ON q.id = g.cuota_id WHERE q.prestamo_id = ?`,
+      [prestamoId]
+    );
+    if ((fila?.n ?? 0) > 0) return;
+    await db.runAsync('DELETE FROM cuotas WHERE prestamo_id = ?', [prestamoId]);
+    await db.runAsync('DELETE FROM prestamos WHERE id = ?', [prestamoId]);
+    eliminado = true;
+  });
+  return eliminado;
+}

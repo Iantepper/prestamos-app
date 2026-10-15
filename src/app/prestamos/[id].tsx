@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
@@ -12,6 +12,7 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { registrarPago } from '@/db/pagos';
 import {
   actualizarCuota,
+  eliminarPrestamoSinPagos,
   listarCuotas,
   obtenerPrestamo,
   type Cuota,
@@ -90,6 +91,36 @@ export default function DetallePrestamoScreen() {
   const moraCobrada = redondear(cuotas.reduce((suma, q) => suma + q.mora_pagada, 0));
   // Suma de las cuotas: coincide con monto + interés, salvo que se haya editado alguna cuota.
   const totalADevolver = redondear(cuotas.reduce((suma, q) => suma + q.monto, 0));
+
+  // Solo se puede borrar un préstamo si todavía no se le cobró nada.
+  const tienePagos = cuotas.some((q) => q.monto_pagado > 0 || q.mora_pagada > 0);
+
+  const eliminar = async () => {
+    try {
+      const eliminado = await eliminarPrestamoSinPagos(db, prestamo.id);
+      if (!eliminado) {
+        Alert.alert('No se puede eliminar', 'Este préstamo tiene pagos registrados.');
+        return;
+      }
+    } catch {
+      Alert.alert('No se pudo eliminar', 'Probá de nuevo.');
+      return;
+    }
+    reprogramarRecordatorios(db);
+    Alert.alert('Préstamo eliminado');
+    router.back();
+  };
+
+  const confirmarEliminar = () => {
+    Alert.alert(
+      '¿Seguro? No se puede deshacer',
+      `Se va a borrar el préstamo de ${prestamo.cliente_nombre} con todas sus cuotas.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Eliminar', style: 'destructive', onPress: eliminar },
+      ]
+    );
+  };
 
   const guardarCuota = async (
     cuota: Cuota,
@@ -204,6 +235,16 @@ export default function DetallePrestamoScreen() {
             </ThemedView>
           );
         })}
+
+        <View style={styles.eliminar}>
+          {tienePagos ? (
+            <ThemedText style={styles.texto} themeColor="textSecondary">
+              Este préstamo tiene pagos registrados, por eso no se puede eliminar.
+            </ThemedText>
+          ) : (
+            <BotonGrande texto="Eliminar préstamo" variante="peligro" onPress={confirmarEliminar} />
+          )}
+        </View>
       </ScrollView>
 
       {cuotaACobrar ? (
@@ -264,6 +305,9 @@ const styles = StyleSheet.create({
   },
   tarjetaVencida: {
     borderColor: COLOR_VENCIDA,
+  },
+  eliminar: {
+    marginTop: Spacing.five,
   },
   botones: {
     marginTop: Spacing.two,
