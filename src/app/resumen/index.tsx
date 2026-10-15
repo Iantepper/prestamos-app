@@ -1,10 +1,11 @@
 // Resumen de las cuentas: lo prestado, lo cobrado, lo que falta y los atrasos.
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BotonGrande } from '@/components/boton-grande';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -94,6 +95,12 @@ export default function ResumenScreen() {
               <Tarjeta titulo="Préstamos saldados" valor={String(resumen.prestamos_saldados)} />
             </>
           ) : null}
+
+          <BotonGrande
+            texto="Ajustes"
+            variante="secundario"
+            onPress={() => router.push('/resumen/ajustes')}
+          />
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
