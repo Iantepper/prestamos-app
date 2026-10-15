@@ -1,16 +1,23 @@
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
-import { Alert, ScrollView, StyleSheet } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BotonGrande } from '@/components/boton-grande';
 import { CampoTexto } from '@/components/campo-texto';
+import { CuadroEditarCliente } from '@/components/cuadro-editar-cliente';
 import { IndicadorRiesgo } from '@/components/indicador-riesgo';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { crearCliente, listarClientes, type Cliente } from '@/db/clientes';
+import {
+  actualizarCliente,
+  crearCliente,
+  listarClientes,
+  type Cliente,
+  type ClienteNuevo,
+} from '@/db/clientes';
 import { obtenerPerfilesRiesgo } from '@/db/riesgo';
 import { hoyISO } from '@/utils/formato';
 import type { NivelRiesgo } from '@/utils/riesgo';
@@ -27,6 +34,7 @@ export default function ClientesScreen() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [perfiles, setPerfiles] = useState<Map<number, NivelRiesgo>>(new Map());
   const [recarga, setRecarga] = useState(0);
+  const [clienteAEditar, setClienteAEditar] = useState<Cliente | null>(null);
 
   // Se recarga al entrar a la pestaña (el perfil cambia con los pagos) y al guardar un cliente.
   useFocusEffect(
@@ -69,6 +77,18 @@ export default function ClientesScreen() {
     setErrores({});
     setRecarga((r) => r + 1);
     Alert.alert('Cliente guardado');
+  };
+
+  const guardarCambios = async (cliente: Cliente, datos: ClienteNuevo) => {
+    try {
+      await actualizarCliente(db, cliente.id, datos);
+    } catch {
+      Alert.alert('No se pudo guardar', 'Probá de nuevo.');
+      return;
+    }
+    setClienteAEditar(null);
+    setRecarga((r) => r + 1);
+    Alert.alert('Cliente actualizado');
   };
 
   return (
@@ -128,11 +148,31 @@ export default function ClientesScreen() {
                   <ThemedText style={styles.dato}>{cliente.telefono}</ThemedText>
                 ) : null}
                 <ThemedText style={styles.dato}>{cliente.direccion}</ThemedText>
+                {cliente.notas ? (
+                  <ThemedText style={styles.dato} themeColor="textSecondary">
+                    {cliente.notas}
+                  </ThemedText>
+                ) : null}
+                <View style={styles.botones}>
+                  <BotonGrande
+                    texto="Editar"
+                    variante="secundario"
+                    onPress={() => setClienteAEditar(cliente)}
+                  />
+                </View>
               </ThemedView>
             ))
           )}
         </ScrollView>
       </SafeAreaView>
+
+      {clienteAEditar ? (
+        <CuadroEditarCliente
+          cliente={clienteAEditar}
+          onGuardar={(datos) => guardarCambios(clienteAEditar, datos)}
+          onCancelar={() => setClienteAEditar(null)}
+        />
+      ) : null}
     </ThemedView>
   );
 }
@@ -158,6 +198,9 @@ const styles = StyleSheet.create({
   },
   tituloLista: {
     marginTop: Spacing.four,
+  },
+  botones: {
+    marginTop: Spacing.two,
   },
   tarjeta: {
     padding: Spacing.three,

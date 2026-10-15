@@ -37,3 +37,21 @@ export async function listarClientes(db: SQLiteDatabase): Promise<Cliente[]> {
     'SELECT id, nombre, telefono, direccion, notas FROM clientes ORDER BY nombre COLLATE NOCASE'
   );
 }
+
+// Cambia los datos de un cliente. Los campos opcionales vacíos se guardan como NULL.
+export async function actualizarCliente(
+  db: SQLiteDatabase,
+  clienteId: number,
+  cliente: ClienteNuevo
+): Promise<void> {
+  await db.runAsync(
+    'UPDATE clientes SET nombre = ?, telefono = ?, direccion = ?, notas = ? WHERE id = ?',
+    [
+      cliente.nombre.trim(),
+      cliente.telefono?.trim() || null,
+      cliente.direccion.trim(),
+      cliente.notas?.trim() || null,
+      clienteId,
+    ]
+  );
+}
