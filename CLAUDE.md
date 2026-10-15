@@ -36,12 +36,49 @@ El indicador siempre muestra el texto además del color.
 - Fase 2: registrar pagos y calcular mora (% diario sobre cuota vencida), saldo pendiente. **Completa.**
 - Fase 3: agenda de cobros por día; tocar un cobro abre Maps (`Linking.openURL` con `https://www.google.com/maps/search/?api=1&query=<dirección codificada>`); marcar como cobrado. **Completa.**
 - Fase 4: notificaciones locales (`expo-notifications`) y resumen (total prestado, por cobrar, atrasos). **Completa.**
-- Fase 5 (opcional): semáforo de riesgo por cliente según atrasos.
-- Fase 6: pulido de usabilidad y demo.
+- Fase 5 (opcional): semáforo de riesgo por cliente según atrasos. **Completa** (ver "Decisión de negocio: perfil de riesgo").
+- Fase 6: pulido de usabilidad y demo. **Completa:** edición de cuotas y clientes, borrado de préstamos sin pagos, revisión de usabilidad, datos de ejemplo y README.
 
 ## Estado actual
-Pestañas: Agenda (`src/app/index.tsx`, cuotas pendientes agrupadas en Atrasadas, Hoy, Mañana y Próximos 7 días, con resumen de lo que hay que cobrar hoy; cada tarjeta tiene "Cómo llegar", que abre Google Maps, y "Cobrar", que abre `CuadroCobro`; consulta en `src/db/agenda.ts`), Clientes (`src/app/clientes.tsx`, formulario de alta y, debajo, listado de clientes; usa `crearCliente` y `listarClientes` de `src/db/clientes.ts`), Préstamos (`src/app/prestamos/`, un Stack dentro de la pestaña: `index.tsx` con el formulario de alta y la lista de préstamos, con botones "Activos" y "Saldados" para alternar, `[id].tsx` con el detalle y sus cuotas; consultas en `src/db/prestamos.ts`) y Resumen (`src/app/resumen.tsx`: prestado en préstamos activos, total cobrado con mora incluida, falta cobrar, cuotas atrasadas con su mora, y cantidad de préstamos activos y saldados; consulta en `src/db/resumen.ts`). Formato de montos y fechas en `src/utils/formato.ts` (`formatearPesos`, `formatearFecha`); en los formularios las fechas se escriben como DD/MM/AAAA. Tarjetas para elegir opciones: `OpcionGrande` en `src/components/`. Repo en GitHub: Iantepper/prestamos-app, rama `main`.
-Si `npx tsc --noEmit` falla por una ruta nueva (`href` o `pathname` no asignable), reiniciar `npx expo start` para regenerar `.expo/types/router.d.ts`.
-Pagos (Fase 2): en el detalle del préstamo, tocar una cuota pendiente abre `CuadroCobro` (`src/components/cuadro-cobro.tsx`) y guarda con `registrarPago` de `src/db/pagos.ts`. Mora en `src/utils/mora.ts` (`calcularMora`, y `calcularMoraPendiente` que descuenta la mora ya cobrada): recargo simple = monto de la cuota × mora% diaria × días de atraso, menos lo ya cobrado de mora en esa cuota. Lo cobrado cubre primero el recargo y el resto va a la cuota: `pagos.mora` es la parte de recargo y `pagos.monto` la parte que se suma a `cuotas.monto_pagado`. La cuota queda pagada cuando `monto_pagado` cubre `monto`, y el préstamo pasa a `saldado` cuando no quedan cuotas pendientes. El saldo ("Cobrado" y "Falta cobrar") no incluye recargos por mora.
-Recordatorios (Fase 4): `src/utils/recordatorios.ts`. Al abrir la app (`_layout.tsx`) se pide permiso la primera vez, con una explicación previa, y se reprograman los avisos; también se reprograman después de crear un préstamo o registrar un pago. Se programa un aviso a las 9:00 por cada día de los próximos 14 que tenga cuotas que vencen ("Hoy tenés N cobros por $X", sin mora). Las notificaciones locales funcionan en Expo Go (las push no, pero no se usan). En Android sin el permiso `SCHEDULE_EXACT_ALARM` el aviso puede llegar con unos minutos de demora.
-**Próximo paso: Fase 5 (opcional, semáforo de riesgo por cliente) o Fase 6 (pulido de usabilidad y demo).** Al terminar cada paso, actualizar esta sección.
+**Proyecto terminado** (todas las fases completas). Repo en GitHub: Iantepper/prestamos-app, rama `main`. El `README.md` describe la app para quien la use o la evalúe.
+
+Pantallas (`src/app/`):
+- **Agenda** (`index.tsx`): cuotas pendientes en Atrasadas, Hoy, Mañana y Próximos 7 días, con el resumen "Hoy tenés que cobrar…". Cada tarjeta tiene "Cómo llegar" (Google Maps) y "Cobrar" (`CuadroCobro`). Consulta en `src/db/agenda.ts`.
+- **Clientes** (`clientes.tsx`): alta y lista con `IndicadorRiesgo`. "Editar" abre `CuadroEditarCliente`. Consultas en `src/db/clientes.ts`.
+- **Préstamos** (`prestamos/`, Stack):
+  - `index.tsx`: alta, eligiendo el cliente con `OpcionGrande` + perfil, con aviso si es Riesgo. Lista con botones "Activos" / "Saldados".
+  - `[id].tsx`: detalle con saldo y cuotas. Cada cuota pendiente tiene "Cobrar" y "Editar" (`CuadroEditarCuota`). "Eliminar préstamo" aparece solo sin pagos (`eliminarPrestamoSinPagos`).
+  - Consultas en `src/db/prestamos.ts`.
+- **Resumen** (`resumen/`, Stack):
+  - `index.tsx`: totales (consulta en `src/db/resumen.ts`).
+  - `ajustes.tsx`: cargar datos de ejemplo y borrar todos los datos, con doble confirmación (`src/db/ejemplo.ts`).
+
+Componentes (`src/components/`):
+- `BotonGrande`, con variantes `principal`, `secundario` y `peligro`.
+- `CampoTexto` y `OpcionGrande`.
+- `CuadroModal`: pantalla completa para formularios cortos, base de los cuadros de cobro y edición.
+- `IndicadorRiesgo`.
+
+Convenciones de la interfaz:
+- **Texto:** `ThemedText` tiene 20 px por defecto; ningún texto baja de 18 px.
+- **Encabezado:** las pantallas apiladas usan `OpcionesEncabezado` de `src/constants/theme.ts`.
+- **Confirmaciones:** cobrar, eliminar un préstamo y borrar datos piden confirmación con `Alert`.
+- **Fechas:** en los formularios se escriben como DD/MM/AAAA (`leerFecha`).
+- **Montos:** se leen con `leerMonto` (acepta "10.500" o "3333,33") y se muestran con `formatearPesos`.
+
+Pagos y mora: `registrarPago` (`src/db/pagos.ts`) y `calcularMoraPendiente` (`src/utils/mora.ts`).
+- **Recargo:** monto de la cuota × mora % diaria × días de atraso, menos la mora ya cobrada de esa cuota.
+- **Reparto:** lo cobrado cubre primero el recargo; `pagos.mora` es esa parte y `pagos.monto` lo que se suma a `cuotas.monto_pagado`.
+- **Cuota pagada:** cuando `monto_pagado` cubre `monto`. El préstamo pasa a `saldado` sin cuotas pendientes.
+- **Saldo:** "Cobrado" y "Falta cobrar" de un préstamo no incluyen mora; el "Total cobrado" del Resumen sí.
+- **Total a devolver:** en el detalle es la suma de las cuotas, porque pueden haberse editado.
+
+Recordatorios: `src/utils/recordatorios.ts`.
+- **Carga diferida:** `expo-notifications` se carga con `require` dentro de un try/catch. Si falla (Expo Go en Android puede no tener el módulo nativo), quedan desactivados con un `console.warn`, y `_layout.tsx` oculta esos avisos con `LogBox.ignoreLogs`.
+- **Permiso:** al abrir la app se pide la primera vez, con una explicación previa.
+- **Avisos:** uno a las 9:00 por cada día de los próximos 14 con cuotas que vencen ("Hoy tenés N cobros por $X", sin mora).
+- **Reprogramación:** al abrir la app y después de crear un préstamo, registrar un pago, editar una cuota, eliminar un préstamo o cargar/borrar datos.
+
+Notas para trabajar:
+- **Tipos de rutas:** si `npx tsc --noEmit` falla por una ruta nueva (`href` o `pathname` no asignable), reiniciar `npx expo start` para regenerar `.expo/types/router.d.ts`. El servidor de desarrollo abierto a veces los regenera mal al agregar archivos.
+- **Pruebas sin celular:** las consultas se probaron con scripts de Node (`node --experimental-strip-types`) contra `node:sqlite` en memoria, con un adaptador que imita `runAsync`, `getAllAsync`, `getFirstAsync` y `withTransactionAsync`.
