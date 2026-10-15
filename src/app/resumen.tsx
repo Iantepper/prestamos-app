@@ -59,7 +59,12 @@ export default function ResumenScreen() {
         <ScrollView contentContainerStyle={styles.contenido}>
           <ThemedText type="subtitle">Resumen</ThemedText>
 
-          {resumen ? (
+          {resumen && resumen.prestamos_activos + resumen.prestamos_saldados === 0 ? (
+            <ThemedText style={styles.titulo}>
+              Todavía no cargaste préstamos. Cuando cargues uno en la pestaña Préstamos, acá vas a
+              ver las cuentas.
+            </ThemedText>
+          ) : resumen ? (
             <>
               <Tarjeta
                 titulo="Prestado (préstamos activos)"

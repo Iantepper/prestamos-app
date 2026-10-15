@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, StyleSheet } from 'react-native';
 
 import { BotonGrande } from '@/components/boton-grande';
 import { CampoTexto } from '@/components/campo-texto';
+import { CuadroModal } from '@/components/cuadro-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { escribirMonto, formatearPesos, leerMonto } from '@/utils/formato';
 
 type Props = {
@@ -39,64 +39,56 @@ export function CuadroCobro({
   const confirmar = () => {
     const cobradoNum = leerMonto(cobrado);
     if (!(cobradoNum > 0)) {
-      setError('Escribí cuánto te paga');
+      setError('Escribí cuánto te paga, por ejemplo 5000');
       return;
     }
     if (cobradoNum > total) {
       setError(`No puede ser más que ${formatearPesos(total)}`);
       return;
     }
+    setError(undefined);
     // Lo cobrado cubre primero el recargo por mora y el resto va a la cuota.
     const mora = Math.min(cobradoNum, recargo);
-    onConfirmar({ monto: redondear(cobradoNum - mora), mora });
+    // Un cobro registrado no se puede borrar: se pide confirmación antes de guardarlo.
+    Alert.alert(
+      '¿Confirmás el cobro?',
+      `Vas a registrar que ${cliente} te pagó ${formatearPesos(cobradoNum)}.`,
+      [
+        { text: 'No, volver', style: 'cancel' },
+        {
+          text: 'Sí, cobré',
+          onPress: () => onConfirmar({ monto: redondear(cobradoNum - mora), mora }),
+        },
+      ]
+    );
   };
 
   return (
-    <Modal visible animationType="slide" onRequestClose={onCancelar}>
-      <ThemedView style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <ScrollView
-            contentContainerStyle={styles.contenido}
-            keyboardShouldPersistTaps="handled"
-            automaticallyAdjustKeyboardInsets>
-            <ThemedText type="subtitle">
-              Cobrar cuota {numeroCuota} a {cliente}
-            </ThemedText>
-
-            <ThemedView type="backgroundElement" style={styles.tarjeta}>
-              <ThemedText style={styles.texto}>
-                Monto de la cuota: {formatearPesos(montoCuota)}
-              </ThemedText>
-              {montoPagado > 0 ? (
-                <ThemedText style={styles.texto}>Ya pagó: {formatearPesos(montoPagado)}</ThemedText>
-              ) : null}
-              {recargo > 0 ? (
-                <ThemedText style={styles.texto}>
-                  Recargo por mora ({textoDias(diasAtraso)} de atraso): {formatearPesos(recargo)}
-                </ThemedText>
-              ) : null}
-              <ThemedText style={styles.total}>Total a cobrar: {formatearPesos(total)}</ThemedText>
-            </ThemedView>
-
-            <CampoTexto
-              etiqueta="Cuánto te paga ahora ($)"
-              value={cobrado}
-              onChangeText={setCobrado}
-              error={error}
-              keyboardType="decimal-pad"
-            />
-
-            <BotonGrande texto="Confirmar cobro" onPress={confirmar} />
-            <Pressable
-              onPress={onCancelar}
-              accessibilityRole="button"
-              style={({ pressed }) => [styles.cancelar, pressed && styles.presionado]}>
-              <ThemedText style={styles.textoCancelar}>Cancelar</ThemedText>
-            </Pressable>
-          </ScrollView>
-        </SafeAreaView>
+    <CuadroModal titulo={`Cobrar cuota ${numeroCuota} a ${cliente}`} onCerrar={onCancelar}>
+      <ThemedView type="backgroundElement" style={styles.tarjeta}>
+        <ThemedText style={styles.texto}>Monto de la cuota: {formatearPesos(montoCuota)}</ThemedText>
+        {montoPagado > 0 ? (
+          <ThemedText style={styles.texto}>Ya pagó: {formatearPesos(montoPagado)}</ThemedText>
+        ) : null}
+        {recargo > 0 ? (
+          <ThemedText style={styles.texto}>
+            Recargo por mora ({textoDias(diasAtraso)} de atraso): {formatearPesos(recargo)}
+          </ThemedText>
+        ) : null}
+        <ThemedText style={styles.total}>Total a cobrar: {formatearPesos(total)}</ThemedText>
       </ThemedView>
-    </Modal>
+
+      <CampoTexto
+        etiqueta="Cuánto te paga ahora ($)"
+        value={cobrado}
+        onChangeText={setCobrado}
+        error={error}
+        keyboardType="decimal-pad"
+      />
+
+      <BotonGrande texto="Confirmar cobro" onPress={confirmar} />
+      <BotonGrande texto="Cancelar" variante="secundario" onPress={onCancelar} />
+    </CuadroModal>
   );
 }
 
@@ -109,19 +101,6 @@ function redondear(valor: number): number {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  safeArea: {
-    flex: 1,
-    maxWidth: MaxContentWidth,
-  },
-  contenido: {
-    padding: Spacing.four,
-    gap: Spacing.three,
-  },
   tarjeta: {
     padding: Spacing.three,
     borderRadius: 12,
@@ -134,18 +113,6 @@ const styles = StyleSheet.create({
   total: {
     fontSize: 24,
     lineHeight: 32,
-    fontWeight: '700',
-  },
-  cancelar: {
-    minHeight: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  presionado: {
-    opacity: 0.7,
-  },
-  textoCancelar: {
-    fontSize: 20,
     fontWeight: '700',
   },
 });

@@ -63,3 +63,10 @@ export const Spacing = {
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
+
+// Encabezado de las pantallas apiladas (detalle, ajustes): título y "Volver" con letra grande.
+export const OpcionesEncabezado = {
+  headerTitleStyle: { fontSize: 22, fontWeight: '700' as const },
+  headerBackTitleStyle: { fontSize: 20 },
+  headerBackTitle: 'Volver',
+};
