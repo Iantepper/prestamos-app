@@ -1,14 +1,14 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 
-import { Spacing } from '@/constants/theme';
+import { Colors, Spacing } from '@/constants/theme';
 
-const COLOR_PRINCIPAL = '#208AEF';
-const COLOR_PELIGRO = '#D32F2F';
+const COLOR_PRINCIPAL = Colors.primary;
+const COLOR_PELIGRO = Colors.danger;
 
 type Props = {
   texto: string;
   onPress: () => void;
-  // principal: azul lleno; secundario: borde azul (acciones menos importantes);
+  // principal: verde lleno; secundario: borde verde (acciones menos importantes);
   // peligro: rojo (acciones que no se pueden deshacer).
   variante?: 'principal' | 'secundario' | 'peligro';
 };
@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   texto: {
-    color: '#ffffff',
+    color: Colors.onPrimary,
     fontSize: 20,
     fontWeight: '700',
   },

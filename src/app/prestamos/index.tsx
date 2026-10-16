@@ -10,7 +10,7 @@ import { IndicadorRiesgo } from '@/components/indicador-riesgo';
 import { OpcionGrande } from '@/components/opcion-grande';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 import { listarClientes, type Cliente } from '@/db/clientes';
 import { crearPrestamo, listarPrestamos, type PrestamoListado } from '@/db/prestamos';
 import { obtenerPerfilesRiesgo } from '@/db/riesgo';
@@ -31,7 +31,7 @@ import {
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
 import type { NivelRiesgo } from '@/utils/riesgo';
 
-const COLOR_ERROR = '#D32F2F';
+const COLOR_ERROR = Colors.danger;
 
 const FRECUENCIAS: { valor: Frecuencia; texto: string }[] = [
   { valor: 'semanal', texto: 'Semanal' },

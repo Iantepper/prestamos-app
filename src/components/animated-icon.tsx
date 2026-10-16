@@ -5,6 +5,8 @@ import { Dimensions, StyleSheet, View } from 'react-native';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { Colors } from '@/constants/theme';
+
 const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
 const DURATION = 600;
 
@@ -33,7 +35,10 @@ export function AnimatedSplashOverlay() {
     },
   });
 
-  const image = <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />;
+  // Mismo ícono y color que la pantalla de carga nativa (app.json), para que el paso sea invisible.
+  const image = (
+    <Image style={styles.imagenCarga} source={require('@/assets/images/splash-icon.png')} />
+  );
 
   return animate ? (
     <Animated.View
@@ -131,16 +136,20 @@ const styles = StyleSheet.create({
     width: 76,
     height: 71,
   },
+  imagenCarga: {
+    width: 76,
+    height: 76,
+  },
   background: {
     borderRadius: 40,
-    experimental_backgroundImage: `linear-gradient(180deg, #3C9FFE, #0274DF)`,
+    backgroundColor: Colors.primary,
     width: 128,
     height: 128,
     position: 'absolute',
   },
   splashOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#208AEF',
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,

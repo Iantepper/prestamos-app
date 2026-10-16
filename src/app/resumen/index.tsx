@@ -8,13 +8,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BotonGrande } from '@/components/boton-grande';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 import { listarCobrosPendientes } from '@/db/agenda';
 import { obtenerResumen, type Resumen } from '@/db/resumen';
 import { formatearPesos, hoyISO, sumarDias } from '@/utils/formato';
 import { calcularMoraPendiente } from '@/utils/mora';
 
-const COLOR_VENCIDA = '#D32F2F';
+const COLOR_VENCIDA = Colors.danger;
 
 type Atrasos = { cantidad: number; monto: number };
 

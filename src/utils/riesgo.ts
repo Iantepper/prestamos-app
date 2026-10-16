@@ -5,6 +5,7 @@
 //   Nuevo (gris):        sin pagos registrados y sin cuotas vencidas.
 //   Cumplidor (verde):   tiene pagos, ninguno tardío en los últimos 90 días, y ninguna cuota vencida.
 // Pago tardío: la fecha del pago es posterior al vencimiento de su cuota.
+import { ColoresRiesgo } from '@/constants/theme';
 import { diasEntre } from '@/utils/mora';
 
 export type NivelRiesgo = 'cumplidor' | 'con_atrasos' | 'riesgo' | 'nuevo';
@@ -31,8 +32,16 @@ export function calcularPerfilRiesgo(historial: HistorialCliente, hoy: string): 
 }
 
 export const PERFILES: Record<NivelRiesgo, { texto: string; color: string; colorTexto: string }> = {
-  cumplidor: { texto: 'Cumplidor', color: '#2E7D32', colorTexto: '#ffffff' },
-  con_atrasos: { texto: 'Con atrasos', color: '#F9A825', colorTexto: '#000000' },
-  riesgo: { texto: 'Riesgo', color: '#D32F2F', colorTexto: '#ffffff' },
-  nuevo: { texto: 'Nuevo', color: '#757575', colorTexto: '#ffffff' },
+  cumplidor: {
+    texto: 'Cumplidor',
+    color: ColoresRiesgo.cumplidor.fondo,
+    colorTexto: ColoresRiesgo.cumplidor.texto,
+  },
+  con_atrasos: {
+    texto: 'Con atrasos',
+    color: ColoresRiesgo.con_atrasos.fondo,
+    colorTexto: ColoresRiesgo.con_atrasos.texto,
+  },
+  riesgo: { texto: 'Riesgo', color: ColoresRiesgo.riesgo.fondo, colorTexto: ColoresRiesgo.riesgo.texto },
+  nuevo: { texto: 'Nuevo', color: ColoresRiesgo.nuevo.fondo, colorTexto: ColoresRiesgo.nuevo.texto },
 };

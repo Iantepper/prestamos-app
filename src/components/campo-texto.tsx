@@ -1,10 +1,10 @@
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { Colors, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-const COLOR_ERROR = '#D32F2F';
+const COLOR_ERROR = Colors.danger;
 
 type Props = TextInputProps & {
   etiqueta: string;
@@ -25,7 +25,7 @@ export function CampoTexto({ etiqueta, error, style, ...rest }: Props) {
           {
             color: theme.text,
             backgroundColor: theme.backgroundElement,
-            borderColor: error ? COLOR_ERROR : theme.backgroundSelected,
+            borderColor: error ? COLOR_ERROR : theme.border,
           },
           style,
         ]}

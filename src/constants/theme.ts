@@ -1,30 +1,30 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
 import '@/global.css';
 
 import { Platform } from 'react-native';
 
+// Paleta única (tema claro): la app no tiene modo oscuro.
 export const Colors = {
-  light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
-  },
-  dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
-  },
+  background: '#FFFAF0', // fondo de las pantallas, color papel
+  backgroundElement: '#FFFFFF', // tarjetas
+  backgroundSelected: '#E8F1EC', // opción elegida (verde muy claro)
+  border: '#E6DFD0', // borde fino de tarjetas y campos
+  text: '#1B1B1B',
+  textSecondary: '#5A5A5A',
+  primary: '#1F6F4A', // verde: botones principales, pagado, al día
+  onPrimary: '#FFFFFF', // texto sobre verde, ámbar o rojo
+  today: '#B7791F', // ámbar: lo que vence hoy
+  danger: '#B3261E', // rojo: atrasado, errores y acciones que no se pueden deshacer
 } as const;
 
-export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
+export type ThemeColor = keyof typeof Colors;
+
+// Colores de los niveles de riesgo (siempre acompañados del texto del nivel).
+export const ColoresRiesgo = {
+  cumplidor: { fondo: '#2E7D32', texto: '#FFFFFF' },
+  con_atrasos: { fondo: '#F9A825', texto: '#1B1B1B' },
+  riesgo: { fondo: Colors.danger, texto: '#FFFFFF' },
+  nuevo: { fondo: '#757575', texto: '#FFFFFF' },
+} as const;
 
 export const Fonts = Platform.select({
   ios: {

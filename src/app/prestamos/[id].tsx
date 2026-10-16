@@ -8,7 +8,7 @@ import { CuadroCobro, textoDias } from '@/components/cuadro-cobro';
 import { CuadroEditarCuota } from '@/components/cuadro-editar-cuota';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 import { registrarPago } from '@/db/pagos';
 import {
   actualizarCuota,
@@ -22,8 +22,8 @@ import { formatearFecha, formatearPesos, hoyISO } from '@/utils/formato';
 import { calcularMoraPendiente } from '@/utils/mora';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
 
-const COLOR_PAGADA = '#2E7D32';
-const COLOR_VENCIDA = '#D32F2F';
+const COLOR_PAGADA = Colors.primary;
+const COLOR_VENCIDA = Colors.danger;
 
 const TEXTO_FRECUENCIA = {
   semanal: 'por semana',

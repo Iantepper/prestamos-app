@@ -9,19 +9,20 @@ import { BotonGrande } from '@/components/boton-grande';
 import { CuadroCobro, textoDias } from '@/components/cuadro-cobro';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 import { listarCobrosPendientes, type CobroPendiente } from '@/db/agenda';
 import { registrarPago } from '@/db/pagos';
 import { formatearFecha, formatearPesos, hoyISO, sumarDias } from '@/utils/formato';
 import { calcularMoraPendiente } from '@/utils/mora';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
 
-const COLOR_VENCIDA = '#D32F2F';
+const COLOR_VENCIDA = Colors.danger;
 
 // Un cobro con lo que hay que cobrar hoy: lo que falta de la cuota más la mora si está vencida.
 type Cobro = CobroPendiente & { diasAtraso: number; recargo: number; aCobrar: number };
 
-type Grupo = { titulo: string; atrasadas: boolean; cobros: Cobro[] };
+// color: rojo para las atrasadas, ámbar para las de hoy; null para el resto.
+type Grupo = { titulo: string; atrasadas: boolean; color: string | null; cobros: Cobro[] };
 
 export default function AgendaScreen() {
   const db = useSQLiteContext();
@@ -67,17 +68,25 @@ export default function AgendaScreen() {
     {
       titulo: 'Atrasadas',
       atrasadas: true,
+      color: COLOR_VENCIDA,
       cobros: cobros.filter((c) => c.fecha_vencimiento < hoy),
     },
-    { titulo: 'Hoy', atrasadas: false, cobros: cobros.filter((c) => c.fecha_vencimiento === hoy) },
+    {
+      titulo: 'Hoy',
+      atrasadas: false,
+      color: Colors.today,
+      cobros: cobros.filter((c) => c.fecha_vencimiento === hoy),
+    },
     {
       titulo: 'Mañana',
       atrasadas: false,
+      color: null,
       cobros: cobros.filter((c) => c.fecha_vencimiento === manana),
     },
     {
       titulo: 'Próximos 7 días',
       atrasadas: false,
+      color: null,
       cobros: cobros.filter((c) => c.fecha_vencimiento > manana),
     },
   ];
@@ -125,14 +134,14 @@ export default function AgendaScreen() {
                   <View key={grupo.titulo} style={styles.grupo}>
                     <ThemedText
                       type="subtitle"
-                      style={[styles.tituloGrupo, grupo.atrasadas && styles.vencida]}>
+                      style={[styles.tituloGrupo, grupo.color ? { color: grupo.color } : null]}>
                       {grupo.titulo}
                     </ThemedText>
                     {grupo.cobros.map((cobro) => (
                       <ThemedView
                         key={cobro.cuota_id}
                         type="backgroundElement"
-                        style={[styles.tarjeta, grupo.atrasadas && styles.tarjetaVencida]}>
+                        style={[styles.tarjeta, grupo.color ? { borderColor: grupo.color } : null]}>
                         <ThemedText style={styles.destacado}>{cobro.cliente_nombre}</ThemedText>
                         <ThemedText style={styles.destacado}>
                           Cobrar: {formatearPesos(cobro.aCobrar)}
@@ -231,9 +240,6 @@ const styles = StyleSheet.create({
   botones: {
     marginTop: Spacing.two,
     gap: Spacing.two,
-  },
-  tarjetaVencida: {
-    borderColor: COLOR_VENCIDA,
   },
   texto: {
     fontSize: 20,

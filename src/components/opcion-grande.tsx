@@ -2,10 +2,10 @@ import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { Colors, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-const COLOR_SELECCION = '#208AEF';
+const COLOR_SELECCION = Colors.primary;
 
 type Props = {
   texto: string;
@@ -29,7 +29,7 @@ export function OpcionGrande({ texto, detalle, seleccionada, onPress, style, chi
         styles.opcion,
         {
           backgroundColor: seleccionada ? theme.backgroundSelected : theme.backgroundElement,
-          borderColor: seleccionada ? COLOR_SELECCION : theme.backgroundSelected,
+          borderColor: seleccionada ? COLOR_SELECCION : theme.border,
         },
         style,
       ]}>

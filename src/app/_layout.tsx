@@ -1,11 +1,12 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
+import { DefaultTheme, ThemeProvider, type Theme } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { SQLiteProvider, useSQLiteContext } from 'expo-sqlite';
 import { useEffect } from 'react';
-import { LogBox, useColorScheme } from 'react-native';
+import { LogBox } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';
+import { Colors } from '@/constants/theme';
 import { migrarDB } from '@/db/database';
 import { iniciarRecordatorios } from '@/utils/recordatorios';
 
@@ -19,11 +20,24 @@ LogBox.ignoreLogs([
   'Push notifications (remote notifications)',
 ]);
 
+// Tema de navegación con la paleta de la app (encabezados y fondos).
+const temaNavegacion: Theme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: Colors.primary,
+    background: Colors.background,
+    card: Colors.background,
+    text: Colors.text,
+    border: Colors.border,
+    notification: Colors.danger,
+  },
+};
+
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
   return (
     <SQLiteProvider databaseName="prestamos.db" onInit={migrarDB}>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <ThemeProvider value={temaNavegacion}>
         <AnimatedSplashOverlay />
         <Recordatorios />
         <AppTabs />
