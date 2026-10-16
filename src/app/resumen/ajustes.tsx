@@ -1,4 +1,5 @@
-// Ajustes: cargar datos de ejemplo para la demo y borrar todos los datos.
+// Ajustes: borrar todos los datos (siempre visible, con doble confirmación) y cargar datos de
+// ejemplo para la demo (solo en modo desarrollo).
 import { useSQLiteContext } from 'expo-sqlite';
 import { Alert, ScrollView, StyleSheet } from 'react-native';
 
@@ -66,7 +67,7 @@ export default function AjustesScreen() {
   const confirmarBorrado = () => {
     Alert.alert(
       '¿Borrar todos los datos?',
-      'Se borran todos los clientes, préstamos, cuotas y pagos.',
+      'Esto borra todos tus clientes y préstamos. No se puede deshacer',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -89,20 +90,21 @@ export default function AjustesScreen() {
   return (
     <ThemedView style={styles.container}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.contenido}>
-        <ThemedView type="backgroundElement" style={styles.tarjeta}>
-          <ThemedText style={styles.titulo}>Datos de ejemplo</ThemedText>
-          <ThemedText>
-            Crea 4 clientes con préstamos en distintos estados (al día, con atrasos, con riesgo y
-            nuevo) para mostrar cómo funciona la app.
-          </ThemedText>
-          <BotonGrande texto="Cargar datos de ejemplo" onPress={confirmarEjemplo} />
-        </ThemedView>
+        {/* Herramienta de prueba: solo en modo desarrollo, no aparece en el APK. */}
+        {__DEV__ ? (
+          <ThemedView type="backgroundElement" style={styles.tarjeta}>
+            <ThemedText style={styles.titulo}>Datos de ejemplo</ThemedText>
+            <ThemedText>
+              Crea 4 clientes con préstamos en distintos estados (al día, con atrasos, con riesgo y
+              nuevo) para mostrar cómo funciona la app.
+            </ThemedText>
+            <BotonGrande texto="Cargar datos de ejemplo" onPress={confirmarEjemplo} />
+          </ThemedView>
+        ) : null}
 
         <ThemedView type="backgroundElement" style={styles.tarjeta}>
           <ThemedText style={styles.titulo}>Borrar todo</ThemedText>
-          <ThemedText>
-            Borra todos los clientes, préstamos y pagos del celular. No se puede deshacer.
-          </ThemedText>
+          <ThemedText>Esto borra todos tus clientes y préstamos. No se puede deshacer.</ThemedText>
           <BotonGrande
             texto="Borrar todos los datos"
             variante="peligro"
