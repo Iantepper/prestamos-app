@@ -8,10 +8,10 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { Alert, Platform } from 'react-native';
 
 import { resumirCobrosPorDia } from '@/db/agenda';
-import { formatearPesos, hoyISO, sumarDias } from '@/utils/formato';
+import { armarAvisos } from '@/utils/avisos-cobro';
+import { hoyISO, sumarDias } from '@/utils/formato';
 
 const CANAL = 'cobros';
-const HORA_RECORDATORIO = 9;
 const DIAS_A_PROGRAMAR = 14;
 
 // undefined: todavía no se intentó cargar; null: no está disponible.
@@ -67,9 +67,18 @@ export async function iniciarRecordatorios(db: SQLiteDatabase): Promise<void> {
   }
 }
 
+// Las reprogramaciones se hacen de a una: si se pidieran dos a la vez (por ejemplo, dos pagos
+// seguidos), sus "borrar todo" y "programar" se mezclarían y quedarían avisos repetidos.
+let cola: Promise<void> = Promise.resolve();
+
 // Borra los recordatorios programados y los vuelve a crear con los cobros actuales.
 // Se llama al abrir la app y después de crear un préstamo o registrar un pago.
-export async function reprogramarRecordatorios(db: SQLiteDatabase): Promise<void> {
+export function reprogramarRecordatorios(db: SQLiteDatabase): Promise<void> {
+  cola = cola.then(() => reprogramarAhora(db));
+  return cola;
+}
+
+async function reprogramarAhora(db: SQLiteDatabase): Promise<void> {
   const Notifications = cargarNotificaciones();
   if (!Notifications) return;
   try {
@@ -79,22 +88,13 @@ export async function reprogramarRecordatorios(db: SQLiteDatabase): Promise<void
     await Notifications.cancelAllScheduledNotificationsAsync();
     const hoy = hoyISO();
     const dias = await resumirCobrosPorDia(db, hoy, sumarDias(hoy, DIAS_A_PROGRAMAR - 1));
-    const ahora = Date.now();
 
-    for (const dia of dias) {
-      const [anio, mes, d] = dia.fecha.split('-').map(Number);
-      const cuando = new Date(anio, mes - 1, d, HORA_RECORDATORIO, 0, 0);
-      if (cuando.getTime() <= ahora) continue; // hoy después de las 9 ya no se avisa
-
-      const cobros = dia.cantidad === 1 ? '1 cobro' : `${dia.cantidad} cobros`;
+    for (const aviso of armarAvisos(dias, new Date())) {
       await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Cobros de hoy',
-          body: `Hoy tenés ${cobros} por ${formatearPesos(dia.monto)}`,
-        },
+        content: { title: 'Cobros de hoy', body: aviso.texto },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: cuando,
+          date: aviso.cuando,
           channelId: CANAL,
         },
       });
