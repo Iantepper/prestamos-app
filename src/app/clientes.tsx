@@ -26,6 +26,7 @@ import {
 import { obtenerPerfilesRiesgo } from '@/db/riesgo';
 import { filtrarPorNombre } from '@/utils/busqueda';
 import { hoyISO } from '@/utils/formato';
+import { llamar } from '@/utils/llamar';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
 import type { NivelRiesgo } from '@/utils/riesgo';
 
@@ -282,6 +283,14 @@ export default function ClientesScreen() {
                       {cliente.notas}
                     </ThemedText>
                   ) : null}
+                  {cliente.telefono ? (
+                    <BotonGrande
+                      texto="Llamar"
+                      icono={{ ios: 'phone.fill', android: 'call', web: 'call' }}
+                      onPress={() => llamar(cliente.telefono ?? '')}
+                      style={styles.botonLlamar}
+                    />
+                  ) : null}
                   <View style={styles.botones}>
                     <BotonGrande
                       texto="Editar"
@@ -344,6 +353,9 @@ const styles = StyleSheet.create({
   },
   botonFila: {
     flex: 1,
+  },
+  botonLlamar: {
+    marginTop: Spacing.two,
   },
   tarjeta: EstiloTarjeta,
   nombre: {
