@@ -1,4 +1,4 @@
-# App de préstamos personales
+# Cuaderno de Cobros
 
 App móvil para un prestamista informal: funciona como una agenda de cobros. Registra clientes y préstamos, calcula las cuotas, lleva la cuenta de lo cobrado y de la mora, avisa los días de cobro y abre el mapa con la dirección del cliente.
 

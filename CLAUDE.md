@@ -1,6 +1,6 @@
 @AGENTS.md
 
-# Proyecto: app de gestión de préstamos personales (TP de Seminario, UTN)
+# Proyecto: Cuaderno de Cobros, app de gestión de préstamos personales (TP de Seminario, UTN)
 
 App móvil simple para un prestamista informal (usuario tipo: persona de unos 60 años, sin conocimientos técnicos). Funciona como agenda de cobros: registra clientes y préstamos, calcula cuotas, lleva las cuentas de lo cobrado, y desde la agenda abre Maps/navegación con la dirección del cliente.
 
@@ -40,7 +40,7 @@ El indicador siempre muestra el texto además del color.
 - Fase 6: pulido de usabilidad y demo. **Completa:** edición de cuotas y clientes, borrado de préstamos sin pagos, revisión de usabilidad, datos de ejemplo y README.
 
 ## Estado actual
-**Proyecto terminado** (todas las fases completas). Repo en GitHub: Iantepper/prestamos-app, rama `main`. El `README.md` describe la app para quien la use o la evalúe.
+**Proyecto terminado** (todas las fases completas). Nombre de la app: "Cuaderno de Cobros" (`app.json`: slug `cuaderno-de-cobros`, paquete Android `com.iantepper.cuadernodecobros`, color de marca `#1F6F4A`). Repo en GitHub: Iantepper/prestamos-app, rama `main`. El `README.md` describe la app para quien la use o la evalúe.
 
 Pantallas (`src/app/`):
 - **Agenda** (`index.tsx`): cuotas pendientes en Atrasadas, Hoy, Mañana y Próximos 7 días, con el resumen "Hoy tenés que cobrar…". Cada tarjeta tiene "Cómo llegar" (Google Maps) y "Cobrar" (`CuadroCobro`). Consulta en `src/db/agenda.ts`.
