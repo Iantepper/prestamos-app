@@ -18,6 +18,7 @@ import {
   contarPrestamosDeCliente,
   crearCliente,
   eliminarCliente,
+  existeClienteIgual,
   listarClientes,
   type Cliente,
   type ClienteNuevo,
@@ -74,6 +75,23 @@ export default function ClientesScreen() {
 
   const guardar = async () => {
     if (!validar()) return;
+    let repetido = false;
+    try {
+      repetido = await existeClienteIgual(db, { nombre, direccion });
+    } catch {
+      // Si no se puede revisar, se guarda igual: el aviso es solo una ayuda.
+    }
+    if (repetido) {
+      Alert.alert('Ya existe un cliente igual', '¿Cargarlo de todas formas?', [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Cargar igual', onPress: guardarNuevo },
+      ]);
+      return;
+    }
+    await guardarNuevo();
+  };
+
+  const guardarNuevo = async () => {
     try {
       await crearCliente(db, { nombre, telefono, direccion, notas });
     } catch {

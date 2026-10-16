@@ -2,6 +2,8 @@
 // Consultas de la tabla clientes.
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import { normalizarTexto } from '@/utils/busqueda';
+
 export type ClienteNuevo = {
   nombre: string;
   telefono?: string;
@@ -30,6 +32,22 @@ export type Cliente = {
   direccion: string;
   notas: string | null;
 };
+
+// Indica si ya hay un cliente con el mismo nombre y la misma dirección. No distingue mayúsculas,
+// acentos ni espacios de más ("Jose  perez" es igual a "José Pérez").
+export async function existeClienteIgual(
+  db: SQLiteDatabase,
+  cliente: { nombre: string; direccion: string }
+): Promise<boolean> {
+  const filas = await db.getAllAsync<{ nombre: string; direccion: string }>(
+    'SELECT nombre, direccion FROM clientes'
+  );
+  const nombre = normalizarTexto(cliente.nombre);
+  const direccion = normalizarTexto(cliente.direccion);
+  return filas.some(
+    (fila) => normalizarTexto(fila.nombre) === nombre && normalizarTexto(fila.direccion) === direccion
+  );
+}
 
 // Devuelve todos los clientes ordenados por nombre.
 export async function listarClientes(db: SQLiteDatabase): Promise<Cliente[]> {
