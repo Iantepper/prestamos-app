@@ -42,6 +42,15 @@ El indicador siempre muestra el texto además del color.
 ## Estado actual
 **Proyecto terminado** (todas las fases completas). Nombre de la app: "Cuaderno de Cobros" (`app.json`: slug `cuaderno-de-cobros`, paquete Android `com.iantepper.cuadernodecobros`, color de marca `#1F6F4A`). Repo en GitHub: Iantepper/prestamos-app, rama `main`. El `README.md` describe la app para quien la use o la evalúe.
 
+**Pendiente: permiso de notificaciones.** En el APK instalado la app no pidió el permiso de notificaciones al abrir; hubo que activarlo a mano desde la info de la app en el celular. Falta:
+1. Revisar cuándo y con qué condiciones se pide el permiso (`iniciarRecordatorios` en `src/utils/recordatorios.ts`).
+2. Agregar en Ajustes una sección "Avisos de cobro" con:
+   - el estado de los avisos;
+   - un botón "Activar avisos";
+   - un botón "Probar aviso", que manda una notificación a los 10 segundos.
+
+Decidido: esperar al resultado de la prueba del aviso de las 9:00 antes de implementarlo.
+
 Pantallas (`src/app/`):
 - **Agenda** (`index.tsx`): cuotas pendientes en Atrasadas, Hoy, Mañana y Próximos 7 días, con el resumen "Hoy tenés que cobrar…". Cada tarjeta tiene "Cómo llegar" (Google Maps) y, si el cliente tiene teléfono, "Llamar", lado a lado en una fila (sin teléfono, "Cómo llegar" ocupa todo el ancho); abajo, "Cobrar" (`CuadroCobro`) a todo el ancho como acción principal. El texto "Tel: ..." se mantiene para ver el número. Consulta en `src/db/agenda.ts`.
 - **Clientes** (`clientes.tsx`): alta y lista con `IndicadorRiesgo`, con un campo "Buscar por nombre" arriba de la lista. "Editar" abre `CuadroEditarCliente`. Consultas en `src/db/clientes.ts`.
