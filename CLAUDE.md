@@ -44,10 +44,13 @@ El indicador siempre muestra el texto además del color.
 
 Pantallas (`src/app/`):
 - **Agenda** (`index.tsx`): cuotas pendientes en Atrasadas, Hoy, Mañana y Próximos 7 días, con el resumen "Hoy tenés que cobrar…". Cada tarjeta tiene "Cómo llegar" (Google Maps) y "Cobrar" (`CuadroCobro`). Consulta en `src/db/agenda.ts`.
-- **Clientes** (`clientes.tsx`): alta y lista con `IndicadorRiesgo`. "Editar" abre `CuadroEditarCliente`. Consultas en `src/db/clientes.ts`.
+- **Clientes** (`clientes.tsx`): alta y lista con `IndicadorRiesgo`, con un campo "Buscar por nombre" arriba de la lista. "Editar" abre `CuadroEditarCliente`. Consultas en `src/db/clientes.ts`.
+  - Al guardar uno nuevo, si ya existe otro con el mismo nombre y dirección (`existeClienteIgual`), pregunta "Ya existe un cliente igual. ¿Cargarlo de todas formas?" (Cancelar / Cargar igual).
+  - "Editar" y "Eliminar" van en la misma fila; "Eliminar" usa la variante `peligroBorde`, para no ser el botón dominante.
   - "Eliminar" (`eliminarCliente`, en una transacción). Con préstamos activos no se puede (avisa "Cobralos o eliminá esos préstamos primero"). Solo con saldados: doble confirmación, y se borran también sus préstamos, cuotas y pagos (cambian los totales del Resumen). Sin préstamos: confirmación simple.
 - **Préstamos** (`prestamos/`, Stack):
   - `index.tsx`: alta, eligiendo el cliente con `OpcionGrande` + perfil, con aviso si es Riesgo. Lista con botones "Activos" / "Saldados".
+    - Elección del cliente: campo "Buscar por nombre". Con más de 5 clientes se muestran solo los 5 primeros que coinciden (`MAX_CLIENTES_VISIBLES`), con el texto "Escribí el nombre para encontrar a otros". El cliente elegido se sigue mostrando aunque cambie la búsqueda.
   - `[id].tsx`: detalle con saldo y cuotas. Cada cuota pendiente tiene "Cobrar" y "Editar" (`CuadroEditarCuota`). "Eliminar préstamo" aparece solo sin pagos (`eliminarPrestamoSinPagos`).
   - Consultas en `src/db/prestamos.ts`.
 - **Resumen** (`resumen/`, Stack):
@@ -55,7 +58,7 @@ Pantallas (`src/app/`):
   - `ajustes.tsx`: cargar datos de ejemplo y borrar todos los datos, con doble confirmación (`src/db/ejemplo.ts`).
 
 Componentes (`src/components/`):
-- `BotonGrande`, con variantes `principal`, `secundario` y `peligro`.
+- `BotonGrande`, con variantes `principal`, `secundario`, `peligro` (rojo lleno) y `peligroBorde` (borde y texto rojos sobre blanco). Acepta `style` (por ejemplo `flex: 1` para dos botones en una fila).
 - `CampoTexto` (acepta `ref` para poner el foco) y `OpcionGrande`.
 - `CuadroModal`: pantalla completa para formularios cortos, base de los cuadros de cobro y edición.
 - `IndicadorRiesgo`.
@@ -71,6 +74,7 @@ Convenciones de la interfaz:
 - **Encabezado:** las pantallas apiladas usan `OpcionesEncabezado` de `src/constants/theme.ts`.
 - **Confirmaciones:** cobrar, eliminar un préstamo, eliminar un cliente y borrar datos piden confirmación con `Alert`.
 - **Fechas:** en los formularios se escriben como DD/MM/AAAA (`leerFecha`).
+- **Búsqueda de nombres:** `filtrarPorNombre` y `normalizarTexto` (`src/utils/busqueda.ts`), que no distinguen mayúsculas, acentos ni espacios de más.
 - **Montos:** se leen con `leerMonto` (acepta "10.500" o "3333,33") y se muestran con `formatearPesos`.
 
 Pagos y mora: `registrarPago` (`src/db/pagos.ts`) y `calcularMoraPendiente` (`src/utils/mora.ts`).
