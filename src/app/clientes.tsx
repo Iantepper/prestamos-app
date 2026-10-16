@@ -23,6 +23,7 @@ import {
   type ClienteNuevo,
 } from '@/db/clientes';
 import { obtenerPerfilesRiesgo } from '@/db/riesgo';
+import { filtrarPorNombre } from '@/utils/busqueda';
 import { hoyISO } from '@/utils/formato';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
 import type { NivelRiesgo } from '@/utils/riesgo';
@@ -42,6 +43,8 @@ export default function ClientesScreen() {
   const [perfiles, setPerfiles] = useState<Map<number, NivelRiesgo>>(new Map());
   const [recarga, setRecarga] = useState(0);
   const [clienteAEditar, setClienteAEditar] = useState<Cliente | null>(null);
+  const [busqueda, setBusqueda] = useState('');
+  const clientesFiltrados = filtrarPorNombre(clientes, busqueda);
 
   // Se recarga al entrar a la pestaña (el perfil cambia con los pagos) y al guardar un cliente.
   useFocusEffect(
@@ -237,35 +240,47 @@ export default function ClientesScreen() {
               ]}
             />
           ) : (
-            clientes.map((cliente) => (
-              <ThemedView key={cliente.id} type="backgroundElement" style={styles.tarjeta}>
-                <ThemedText style={styles.nombre}>{cliente.nombre}</ThemedText>
-                <IndicadorRiesgo nivel={perfiles.get(cliente.id) ?? 'nuevo'} />
-                {cliente.telefono ? (
-                  <ThemedText style={styles.dato}>{cliente.telefono}</ThemedText>
-                ) : null}
-                <ThemedText style={styles.dato}>{cliente.direccion}</ThemedText>
-                {cliente.notas ? (
-                  <ThemedText style={styles.dato} themeColor="textSecondary">
-                    {cliente.notas}
-                  </ThemedText>
-                ) : null}
-                <View style={styles.botones}>
-                  <BotonGrande
-                    texto="Editar"
-                    variante="secundario"
-                    onPress={() => setClienteAEditar(cliente)}
-                    style={styles.botonFila}
-                  />
-                  <BotonGrande
-                    texto="Eliminar"
-                    variante="peligroBorde"
-                    onPress={() => confirmarEliminar(cliente)}
-                    style={styles.botonFila}
-                  />
-                </View>
-              </ThemedView>
-            ))
+            <>
+              <CampoTexto
+                etiqueta="Buscar por nombre"
+                value={busqueda}
+                onChangeText={setBusqueda}
+                placeholder="Ej: María"
+                autoCorrect={false}
+              />
+              {clientesFiltrados.length === 0 ? (
+                <ThemedText style={styles.dato}>No hay clientes con ese nombre</ThemedText>
+              ) : null}
+              {clientesFiltrados.map((cliente) => (
+                <ThemedView key={cliente.id} type="backgroundElement" style={styles.tarjeta}>
+                  <ThemedText style={styles.nombre}>{cliente.nombre}</ThemedText>
+                  <IndicadorRiesgo nivel={perfiles.get(cliente.id) ?? 'nuevo'} />
+                  {cliente.telefono ? (
+                    <ThemedText style={styles.dato}>{cliente.telefono}</ThemedText>
+                  ) : null}
+                  <ThemedText style={styles.dato}>{cliente.direccion}</ThemedText>
+                  {cliente.notas ? (
+                    <ThemedText style={styles.dato} themeColor="textSecondary">
+                      {cliente.notas}
+                    </ThemedText>
+                  ) : null}
+                  <View style={styles.botones}>
+                    <BotonGrande
+                      texto="Editar"
+                      variante="secundario"
+                      onPress={() => setClienteAEditar(cliente)}
+                      style={styles.botonFila}
+                    />
+                    <BotonGrande
+                      texto="Eliminar"
+                      variante="peligroBorde"
+                      onPress={() => confirmarEliminar(cliente)}
+                      style={styles.botonFila}
+                    />
+                  </View>
+                </ThemedView>
+              ))}
+            </>
           )}
         </ScrollView>
       </SafeAreaView>

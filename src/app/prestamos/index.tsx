@@ -30,11 +30,14 @@ import {
   type DatosPrestamo,
   type Frecuencia,
 } from '@/utils/cuotas';
+import { filtrarPorNombre } from '@/utils/busqueda';
 import { formatearFecha, hoyISO, leerDecimal, leerEntero, leerFecha } from '@/utils/formato';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
 import type { NivelRiesgo } from '@/utils/riesgo';
 
 const COLOR_ERROR = Colors.danger;
+// En el alta de préstamo, cuántos clientes se muestran como máximo para elegir.
+const MAX_CLIENTES_VISIBLES = 5;
 
 const FRECUENCIAS: { valor: Frecuencia; texto: string }[] = [
   { valor: 'semanal', texto: 'Semanal' },
@@ -56,6 +59,7 @@ export default function PrestamosScreen() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const scrollRef = useRef<ScrollView>(null);
   const [clienteId, setClienteId] = useState<number | null>(null);
+  const [busqueda, setBusqueda] = useState('');
   const [monto, setMonto] = useState('');
   const [tasa, setTasa] = useState('');
   const [cuotas, setCuotas] = useState('');
@@ -91,6 +95,19 @@ export default function PrestamosScreen() {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [db, recarga, verSaldados])
   );
+
+  // Con muchos clientes se muestran solo los primeros que coinciden con la búsqueda.
+  // El cliente elegido se muestra siempre, aunque no coincida.
+  const coincidencias = filtrarPorNombre(clientes, busqueda);
+  const hayMasCoincidencias =
+    clientes.length > MAX_CLIENTES_VISIBLES && coincidencias.length > MAX_CLIENTES_VISIBLES;
+  const primeros =
+    clientes.length > MAX_CLIENTES_VISIBLES
+      ? coincidencias.slice(0, MAX_CLIENTES_VISIBLES)
+      : coincidencias;
+  const clienteElegido = clientes.find((c) => c.id === clienteId);
+  const clientesVisibles =
+    clienteElegido && !primeros.includes(clienteElegido) ? [clienteElegido, ...primeros] : primeros;
 
   const montoNum = leerEntero(monto);
   const tasaNum = leerDecimal(tasa);
@@ -133,6 +150,7 @@ export default function PrestamosScreen() {
       return;
     }
     setClienteId(null);
+    setBusqueda('');
     setMonto('');
     setTasa('');
     setCuotas('');
@@ -177,7 +195,17 @@ export default function PrestamosScreen() {
             <>
               <View style={styles.grupo}>
                 <ThemedText style={styles.etiqueta}>Cliente *</ThemedText>
-                {clientes.map((cliente) => (
+                <CampoTexto
+                  etiqueta="Buscar por nombre"
+                  value={busqueda}
+                  onChangeText={setBusqueda}
+                  placeholder="Ej: María"
+                  autoCorrect={false}
+                />
+                {coincidencias.length === 0 ? (
+                  <ThemedText style={styles.texto}>No hay clientes con ese nombre</ThemedText>
+                ) : null}
+                {clientesVisibles.map((cliente) => (
                   <OpcionGrande
                     key={cliente.id}
                     texto={cliente.nombre}
@@ -187,6 +215,11 @@ export default function PrestamosScreen() {
                     <IndicadorRiesgo nivel={perfiles.get(cliente.id) ?? 'nuevo'} />
                   </OpcionGrande>
                 ))}
+                {hayMasCoincidencias ? (
+                  <ThemedText style={styles.texto} themeColor="textSecondary">
+                    Escribí el nombre para encontrar a otros
+                  </ThemedText>
+                ) : null}
                 {clienteId !== null && perfiles.get(clienteId) === 'riesgo' ? (
                   <ThemedView style={styles.avisoRiesgo}>
                     <ThemedText style={styles.textoAvisoRiesgo}>
