@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
+import { SymbolView, type SymbolViewProps } from 'expo-symbols';
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Colors, Spacing } from '@/constants/theme';
 
@@ -14,10 +15,18 @@ type Props = {
   // pero que no debe ser el botón dominante, por ejemplo "Eliminar" en una lista).
   variante?: 'principal' | 'secundario' | 'peligro' | 'peligroBorde';
   style?: StyleProp<ViewStyle>;
+  // Ícono a la izquierda del texto: SF Symbol en iOS y Material Symbol en Android y web.
+  icono?: SymbolViewProps['name'];
 };
 
 // Botón grande y de alto contraste para las acciones principales.
-export function BotonGrande({ texto, onPress, variante = 'principal', style }: Props) {
+export function BotonGrande({ texto, onPress, variante = 'principal', style, icono }: Props) {
+  const colorTexto =
+    variante === 'secundario'
+      ? COLOR_PRINCIPAL
+      : variante === 'peligroBorde'
+        ? COLOR_PELIGRO
+        : Colors.onPrimary;
   return (
     <Pressable
       onPress={onPress}
@@ -30,14 +39,10 @@ export function BotonGrande({ texto, onPress, variante = 'principal', style }: P
         pressed && styles.presionado,
         style,
       ]}>
-      <Text
-        style={[
-          styles.texto,
-          variante === 'secundario' && styles.textoSecundario,
-          variante === 'peligroBorde' && styles.textoPeligro,
-        ]}>
-        {texto}
-      </Text>
+      <View style={styles.contenido}>
+        {icono ? <SymbolView name={icono} size={26} tintColor={colorTexto} /> : null}
+        <Text style={[styles.texto, { color: colorTexto }]}>{texto}</Text>
+      </View>
     </Pressable>
   );
 }
@@ -67,16 +72,16 @@ const styles = StyleSheet.create({
   presionado: {
     opacity: 0.8,
   },
+  contenido: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+  },
   texto: {
-    color: Colors.onPrimary,
+    flexShrink: 1, // si no entra en una línea, el texto baja de renglón en vez de salirse
     fontSize: 20,
     fontWeight: '700',
     textAlign: 'center',
-  },
-  textoSecundario: {
-    color: COLOR_PRINCIPAL,
-  },
-  textoPeligro: {
-    color: COLOR_PELIGRO,
   },
 });

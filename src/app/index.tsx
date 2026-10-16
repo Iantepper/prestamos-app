@@ -24,6 +24,7 @@ import { listarCobrosPendientes, type CobroPendiente } from '@/db/agenda';
 import { registrarPago } from '@/db/pagos';
 import { contarClientesYPrestamos } from '@/db/resumen';
 import { formatearFecha, hoyISO, sumarDias } from '@/utils/formato';
+import { llamar } from '@/utils/llamar';
 import { calcularMoraPendiente } from '@/utils/mora';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
 
@@ -204,10 +205,23 @@ export default function AgendaScreen() {
                           <ThemedText style={styles.texto}>Tel: {cobro.telefono}</ThemedText>
                         ) : null}
                         <View style={styles.botones}>
-                          <BotonGrande
-                            texto="Cómo llegar"
-                            onPress={() => abrirMapa(cobro.direccion)}
-                          />
+                          <View style={styles.filaBotones}>
+                            <BotonGrande
+                              texto="Cómo llegar"
+                              variante="secundario"
+                              onPress={() => abrirMapa(cobro.direccion)}
+                              style={styles.botonFila}
+                            />
+                            {cobro.telefono ? (
+                              <BotonGrande
+                                texto="Llamar"
+                                variante="secundario"
+                                icono={{ ios: 'phone.fill', android: 'call', web: 'call' }}
+                                onPress={() => llamar(cobro.telefono ?? '')}
+                                style={styles.botonFila}
+                              />
+                            ) : null}
+                          </View>
                           <BotonGrande texto="Cobrar" onPress={() => setCobroACobrar(cobro)} />
                         </View>
                       </ThemedView>
@@ -278,6 +292,14 @@ const styles = StyleSheet.create({
   botones: {
     marginTop: Spacing.two,
     gap: Spacing.two,
+  },
+  // "Cómo llegar" y "Llamar" lado a lado; sin teléfono, "Cómo llegar" ocupa todo el ancho.
+  filaBotones: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  botonFila: {
+    flex: 1,
   },
   texto: {
     fontSize: 20,
