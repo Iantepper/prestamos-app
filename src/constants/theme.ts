@@ -70,3 +70,19 @@ export const OpcionesEncabezado = {
   headerBackTitleStyle: { fontSize: 20 },
   headerBackTitle: 'Volver',
 };
+
+// Tarjeta blanca con borde fino y sombra suave: base de todas las tarjetas de la app.
+export const EstiloTarjeta = {
+  backgroundColor: Colors.backgroundElement,
+  borderRadius: 16,
+  borderWidth: 1,
+  borderColor: Colors.border,
+  padding: Spacing.three,
+  gap: Spacing.two,
+  boxShadow: '0px 2px 6px rgba(27, 27, 27, 0.08)',
+} as const;
+
+// Tarjeta resaltada con un borde de color (atrasada, hoy, aviso).
+export function bordeDestacado(color: string) {
+  return { borderColor: color, borderWidth: 2 } as const;
+}

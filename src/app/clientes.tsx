@@ -8,9 +8,10 @@ import { BotonGrande } from '@/components/boton-grande';
 import { CampoTexto } from '@/components/campo-texto';
 import { CuadroEditarCliente } from '@/components/cuadro-editar-cliente';
 import { IndicadorRiesgo } from '@/components/indicador-riesgo';
+import { EncabezadoPantalla } from '@/components/encabezado-pantalla';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, EstiloTarjeta, MaxContentWidth, Spacing } from '@/constants/theme';
 import {
   actualizarCliente,
   crearCliente,
@@ -98,6 +99,10 @@ export default function ClientesScreen() {
           contentContainerStyle={styles.contenido}
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets>
+          <EncabezadoPantalla
+            titulo="Clientes"
+            descripcion="Las personas a las que les prestás: cargá una nueva o mirá cómo viene pagando cada una."
+          />
           <ThemedText type="subtitle">Nuevo cliente</ThemedText>
 
           <CampoTexto
@@ -202,11 +207,7 @@ const styles = StyleSheet.create({
   botones: {
     marginTop: Spacing.two,
   },
-  tarjeta: {
-    padding: Spacing.three,
-    borderRadius: 12,
-    gap: Spacing.one,
-  },
+  tarjeta: EstiloTarjeta,
   nombre: {
     fontSize: 24,
     lineHeight: 32,

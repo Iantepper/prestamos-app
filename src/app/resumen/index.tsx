@@ -6,9 +6,17 @@ import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BotonGrande } from '@/components/boton-grande';
+import { EncabezadoPantalla } from '@/components/encabezado-pantalla';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import {
+  BottomTabInset,
+  Colors,
+  bordeDestacado,
+  EstiloTarjeta,
+  MaxContentWidth,
+  Spacing,
+} from '@/constants/theme';
 import { listarCobrosPendientes } from '@/db/agenda';
 import { obtenerResumen, type Resumen } from '@/db/resumen';
 import { formatearPesos, hoyISO, sumarDias } from '@/utils/formato';
@@ -58,7 +66,10 @@ export default function ResumenScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView contentContainerStyle={styles.contenido}>
-          <ThemedText type="subtitle">Resumen</ThemedText>
+          <EncabezadoPantalla
+            titulo="Resumen"
+            descripcion="Cómo están tus cuentas: lo prestado, lo cobrado y lo que falta."
+          />
 
           {resumen && resumen.prestamos_activos + resumen.prestamos_saldados === 0 ? (
             <ThemedText style={styles.titulo}>
@@ -134,16 +145,8 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.five,
   },
-  tarjeta: {
-    padding: Spacing.three,
-    borderRadius: 12,
-    borderWidth: 3,
-    borderColor: 'transparent',
-    gap: Spacing.one,
-  },
-  tarjetaAlerta: {
-    borderColor: COLOR_VENCIDA,
-  },
+  tarjeta: EstiloTarjeta,
+  tarjetaAlerta: bordeDestacado(COLOR_VENCIDA),
   titulo: {
     fontSize: 20,
     lineHeight: 28,

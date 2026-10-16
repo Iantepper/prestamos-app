@@ -7,10 +7,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BotonGrande } from '@/components/boton-grande';
 import { CampoTexto } from '@/components/campo-texto';
 import { IndicadorRiesgo } from '@/components/indicador-riesgo';
+import { Monto } from '@/components/monto';
 import { OpcionGrande } from '@/components/opcion-grande';
+import { EncabezadoPantalla } from '@/components/encabezado-pantalla';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import {
+  BottomTabInset,
+  Colors,
+  bordeDestacado,
+  EstiloTarjeta,
+  MaxContentWidth,
+  Spacing,
+} from '@/constants/theme';
 import { listarClientes, type Cliente } from '@/db/clientes';
 import { crearPrestamo, listarPrestamos, type PrestamoListado } from '@/db/prestamos';
 import { obtenerPerfilesRiesgo } from '@/db/riesgo';
@@ -20,14 +29,7 @@ import {
   type DatosPrestamo,
   type Frecuencia,
 } from '@/utils/cuotas';
-import {
-  formatearFecha,
-  formatearPesos,
-  hoyISO,
-  leerDecimal,
-  leerEntero,
-  leerFecha,
-} from '@/utils/formato';
+import { formatearFecha, hoyISO, leerDecimal, leerEntero, leerFecha } from '@/utils/formato';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
 import type { NivelRiesgo } from '@/utils/riesgo';
 
@@ -74,19 +76,17 @@ export default function PrestamosScreen() {
         listarClientes(db),
         listarPrestamos(db, verSaldados ? 'saldado' : 'activo'),
         obtenerPerfilesRiesgo(db, hoyISO()),
-      ]).then(
-        ([filasClientes, filasPrestamos, perfilesClientes]) => {
-          if (!activo) return;
-          setClientes(filasClientes);
-          setPrestamos(filasPrestamos);
-          setPerfiles(perfilesClientes);
-        },
-      );
+      ]).then(([filasClientes, filasPrestamos, perfilesClientes]) => {
+        if (!activo) return;
+        setClientes(filasClientes);
+        setPrestamos(filasPrestamos);
+        setPerfiles(perfilesClientes);
+      });
       return () => {
         activo = false;
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [db, recarga, verSaldados]),
+    }, [db, recarga, verSaldados])
   );
 
   const montoNum = leerEntero(monto);
@@ -149,6 +149,10 @@ export default function PrestamosScreen() {
           contentContainerStyle={styles.contenido}
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets>
+          <EncabezadoPantalla
+            titulo="Préstamos"
+            descripcion="Creá un préstamo nuevo y seguí los que ya diste."
+          />
           <ThemedText type="subtitle">Nuevo préstamo</ThemedText>
 
           {clientes.length === 0 ? (
@@ -242,8 +246,8 @@ export default function PrestamosScreen() {
               {datos && cuotasCalculadas ? (
                 <ThemedView type="backgroundElement" style={styles.vistaPrevia}>
                   <ThemedText style={styles.textoVistaPrevia}>
-                    Vas a devolver {formatearPesos(totalADevolver(datos.monto, datos.tasaPct))} en{' '}
-                    {datos.cantCuotas} cuotas de {formatearPesos(cuotasCalculadas[0].monto)}
+                    Vas a devolver <Monto valor={totalADevolver(datos.monto, datos.tasaPct)} /> en{' '}
+                    {datos.cantCuotas} cuotas de <Monto valor={cuotasCalculadas[0].monto} />
                   </ThemedText>
                   <ThemedText style={styles.texto}>
                     Primera cuota: {formatearFecha(cuotasCalculadas[0].fechaVencimiento)}
@@ -293,16 +297,16 @@ export default function PrestamosScreen() {
                 <ThemedView type="backgroundElement" style={styles.tarjeta}>
                   <ThemedText style={styles.nombre}>{prestamo.cliente_nombre}</ThemedText>
                   <ThemedText style={styles.texto}>
-                    Prestado: {formatearPesos(prestamo.monto)}
+                    Prestado: <Monto valor={prestamo.monto} />
                   </ThemedText>
                   <ThemedText style={styles.texto}>
                     Cuotas pagas: {prestamo.cuotas_pagadas} de {prestamo.cant_cuotas}
                   </ThemedText>
                   <ThemedText style={styles.texto}>
-                    Cobrado: {formatearPesos(prestamo.cobrado)}
+                    Cobrado: <Monto valor={prestamo.cobrado} />
                   </ThemedText>
                   <ThemedText style={styles.texto}>
-                    Falta cobrar: {formatearPesos(prestamo.falta_cobrar)}
+                    Falta cobrar: <Monto valor={prestamo.falta_cobrar} />
                   </ThemedText>
                   {prestamo.proximo_vencimiento ? (
                     <ThemedText style={styles.texto}>
@@ -353,23 +357,14 @@ const styles = StyleSheet.create({
   error: {
     color: COLOR_ERROR,
   },
-  avisoRiesgo: {
-    padding: Spacing.three,
-    borderRadius: 12,
-    borderWidth: 3,
-    borderColor: COLOR_ERROR,
-  },
+  avisoRiesgo: { ...EstiloTarjeta, ...bordeDestacado(COLOR_ERROR) },
   textoAvisoRiesgo: {
     color: COLOR_ERROR,
     fontSize: 20,
     lineHeight: 28,
     fontWeight: '700',
   },
-  vistaPrevia: {
-    padding: Spacing.three,
-    borderRadius: 12,
-    gap: Spacing.one,
-  },
+  vistaPrevia: EstiloTarjeta,
   selector: {
     flexDirection: 'row',
     gap: Spacing.two,
@@ -381,11 +376,7 @@ const styles = StyleSheet.create({
   tituloLista: {
     marginTop: Spacing.four,
   },
-  tarjeta: {
-    padding: Spacing.three,
-    borderRadius: 12,
-    gap: Spacing.one,
-  },
+  tarjeta: EstiloTarjeta,
   nombre: {
     fontSize: 24,
     lineHeight: 32,

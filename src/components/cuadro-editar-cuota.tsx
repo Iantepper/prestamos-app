@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { BotonGrande } from '@/components/boton-grande';
 import { CampoTexto } from '@/components/campo-texto';
 import { CuadroModal } from '@/components/cuadro-modal';
+import { Monto } from '@/components/monto';
 import { ThemedText } from '@/components/themed-text';
 import {
   escribirMonto,
@@ -54,7 +55,9 @@ export function CuadroEditarCuota({
   return (
     <CuadroModal titulo={`Editar cuota ${numeroCuota}`} onCerrar={onCancelar}>
       {montoPagado > 0 ? (
-        <ThemedText>Ya pagó {formatearPesos(montoPagado)} de esta cuota.</ThemedText>
+        <ThemedText>
+          Ya pagó <Monto valor={montoPagado} /> de esta cuota.
+        </ThemedText>
       ) : null}
       <CampoTexto
         etiqueta="Fecha de vencimiento (día/mes/año)"

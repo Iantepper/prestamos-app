@@ -7,12 +7,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BotonGrande } from '@/components/boton-grande';
 import { CuadroCobro, textoDias } from '@/components/cuadro-cobro';
+import { Monto } from '@/components/monto';
+import { EncabezadoPantalla } from '@/components/encabezado-pantalla';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import {
+  BottomTabInset,
+  Colors,
+  bordeDestacado,
+  EstiloTarjeta,
+  MaxContentWidth,
+  Spacing,
+} from '@/constants/theme';
 import { listarCobrosPendientes, type CobroPendiente } from '@/db/agenda';
 import { registrarPago } from '@/db/pagos';
-import { formatearFecha, formatearPesos, hoyISO, sumarDias } from '@/utils/formato';
+import { formatearFecha, hoyISO, sumarDias } from '@/utils/formato';
 import { calcularMoraPendiente } from '@/utils/mora';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
 
@@ -109,7 +118,10 @@ export default function AgendaScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView contentContainerStyle={styles.contenido}>
-          <ThemedText type="subtitle">Agenda de cobros</ThemedText>
+          <EncabezadoPantalla
+            titulo="Agenda"
+            descripcion="Lo que tenés que cobrar hoy y en los próximos días."
+          />
 
           {cobros.length === 0 ? (
             <ThemedText style={styles.texto}>No tenés cobros para estos días</ThemedText>
@@ -117,13 +129,13 @@ export default function AgendaScreen() {
             <>
               <ThemedView type="backgroundElement" style={styles.tarjeta}>
                 <ThemedText style={styles.destacado}>
-                  Hoy tenés que cobrar {formatearPesos(sumar(deHoy.cobros))} en{' '}
+                  Hoy tenés que cobrar <Monto valor={sumar(deHoy.cobros)} /> en{' '}
                   {textoCuotas(deHoy.cobros.length)}
                 </ThemedText>
                 {atrasadas.cobros.length > 0 ? (
                   <ThemedText style={[styles.texto, styles.vencida]}>
                     Además tenés {textoCuotas(atrasadas.cobros.length)} atrasadas por{' '}
-                    {formatearPesos(sumar(atrasadas.cobros))}
+                    <Monto valor={sumar(atrasadas.cobros)} />
                   </ThemedText>
                 ) : null}
               </ThemedView>
@@ -141,10 +153,10 @@ export default function AgendaScreen() {
                       <ThemedView
                         key={cobro.cuota_id}
                         type="backgroundElement"
-                        style={[styles.tarjeta, grupo.color ? { borderColor: grupo.color } : null]}>
+                        style={[styles.tarjeta, grupo.color ? bordeDestacado(grupo.color) : null]}>
                         <ThemedText style={styles.destacado}>{cobro.cliente_nombre}</ThemedText>
                         <ThemedText style={styles.destacado}>
-                          Cobrar: {formatearPesos(cobro.aCobrar)}
+                          Cobrar: <Monto valor={cobro.aCobrar} />
                         </ThemedText>
                         {grupo.atrasadas ? (
                           <ThemedText style={[styles.texto, styles.vencida]}>
@@ -230,13 +242,7 @@ const styles = StyleSheet.create({
   tituloGrupo: {
     marginTop: Spacing.three,
   },
-  tarjeta: {
-    padding: Spacing.three,
-    borderRadius: 12,
-    borderWidth: 3,
-    borderColor: 'transparent',
-    gap: Spacing.one,
-  },
+  tarjeta: EstiloTarjeta,
   botones: {
     marginTop: Spacing.two,
     gap: Spacing.two,

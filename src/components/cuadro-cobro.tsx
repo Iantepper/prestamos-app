@@ -4,9 +4,10 @@ import { Alert, StyleSheet } from 'react-native';
 import { BotonGrande } from '@/components/boton-grande';
 import { CampoTexto } from '@/components/campo-texto';
 import { CuadroModal } from '@/components/cuadro-modal';
+import { Monto } from '@/components/monto';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { EstiloTarjeta } from '@/constants/theme';
 import { escribirMonto, formatearPesos, leerMonto } from '@/utils/formato';
 
 type Props = {
@@ -66,16 +67,22 @@ export function CuadroCobro({
   return (
     <CuadroModal titulo={`Cobrar cuota ${numeroCuota} a ${cliente}`} onCerrar={onCancelar}>
       <ThemedView type="backgroundElement" style={styles.tarjeta}>
-        <ThemedText style={styles.texto}>Monto de la cuota: {formatearPesos(montoCuota)}</ThemedText>
+        <ThemedText style={styles.texto}>
+          Monto de la cuota: <Monto valor={montoCuota} />
+        </ThemedText>
         {montoPagado > 0 ? (
-          <ThemedText style={styles.texto}>Ya pagó: {formatearPesos(montoPagado)}</ThemedText>
+          <ThemedText style={styles.texto}>
+            Ya pagó: <Monto valor={montoPagado} />
+          </ThemedText>
         ) : null}
         {recargo > 0 ? (
           <ThemedText style={styles.texto}>
-            Recargo por mora ({textoDias(diasAtraso)} de atraso): {formatearPesos(recargo)}
+            Recargo por mora ({textoDias(diasAtraso)} de atraso): <Monto valor={recargo} />
           </ThemedText>
         ) : null}
-        <ThemedText style={styles.total}>Total a cobrar: {formatearPesos(total)}</ThemedText>
+        <ThemedText style={styles.total}>
+          Total a cobrar: <Monto valor={total} />
+        </ThemedText>
       </ThemedView>
 
       <CampoTexto
@@ -101,11 +108,7 @@ function redondear(valor: number): number {
 }
 
 const styles = StyleSheet.create({
-  tarjeta: {
-    padding: Spacing.three,
-    borderRadius: 12,
-    gap: Spacing.one,
-  },
+  tarjeta: EstiloTarjeta,
   texto: {
     fontSize: 20,
     lineHeight: 28,

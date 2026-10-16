@@ -5,7 +5,7 @@ import { Alert, ScrollView, StyleSheet } from 'react-native';
 import { BotonGrande } from '@/components/boton-grande';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, EstiloTarjeta, MaxContentWidth, Spacing } from '@/constants/theme';
 import { borrarTodosLosDatos, cargarDatosDeEjemplo, hayDatos } from '@/db/ejemplo';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
 
@@ -129,11 +129,7 @@ const styles = StyleSheet.create({
     gap: Spacing.four,
     paddingBottom: BottomTabInset + Spacing.five,
   },
-  tarjeta: {
-    padding: Spacing.three,
-    borderRadius: 12,
-    gap: Spacing.three,
-  },
+  tarjeta: EstiloTarjeta,
   titulo: {
     fontSize: 24,
     lineHeight: 32,

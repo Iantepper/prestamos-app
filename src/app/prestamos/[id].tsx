@@ -6,9 +6,17 @@ import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { BotonGrande } from '@/components/boton-grande';
 import { CuadroCobro, textoDias } from '@/components/cuadro-cobro';
 import { CuadroEditarCuota } from '@/components/cuadro-editar-cuota';
+import { Monto } from '@/components/monto';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import {
+  BottomTabInset,
+  Colors,
+  bordeDestacado,
+  EstiloTarjeta,
+  MaxContentWidth,
+  Spacing,
+} from '@/constants/theme';
 import { registrarPago } from '@/db/pagos';
 import {
   actualizarCuota,
@@ -18,7 +26,7 @@ import {
   type Cuota,
   type PrestamoDetalle,
 } from '@/db/prestamos';
-import { formatearFecha, formatearPesos, hoyISO } from '@/utils/formato';
+import { formatearFecha, hoyISO } from '@/utils/formato';
 import { calcularMoraPendiente } from '@/utils/mora';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
 
@@ -160,10 +168,12 @@ export default function DetallePrestamoScreen() {
           {prestamo.estado === 'saldado' ? (
             <ThemedText style={[styles.destacado, styles.pagada]}>Préstamo saldado</ThemedText>
           ) : null}
-          <ThemedText style={styles.texto}>Prestado: {formatearPesos(prestamo.monto)}</ThemedText>
+          <ThemedText style={styles.texto}>
+            Prestado: <Monto valor={prestamo.monto} />
+          </ThemedText>
           <ThemedText style={styles.texto}>Interés: {prestamo.tasa_interes} %</ThemedText>
           <ThemedText style={styles.texto}>
-            Total a devolver: {formatearPesos(totalADevolver)}
+            Total a devolver: <Monto valor={totalADevolver} />
           </ThemedText>
           <ThemedText style={styles.texto}>
             {prestamo.cant_cuotas} cuotas, {TEXTO_FRECUENCIA[prestamo.frecuencia]}
@@ -179,14 +189,16 @@ export default function DetallePrestamoScreen() {
         </ThemedView>
 
         <ThemedView type="backgroundElement" style={styles.tarjeta}>
-          <ThemedText style={styles.texto}>Cobrado: {formatearPesos(cobrado)}</ThemedText>
+          <ThemedText style={styles.texto}>
+            Cobrado: <Monto valor={cobrado} />
+          </ThemedText>
           {moraCobrada > 0 ? (
             <ThemedText style={styles.texto}>
-              Recargos por mora cobrados: {formatearPesos(moraCobrada)}
+              Recargos por mora cobrados: <Monto valor={moraCobrada} />
             </ThemedText>
           ) : null}
           <ThemedText style={styles.destacado}>
-            Falta cobrar: {formatearPesos(faltaCobrar)}
+            Falta cobrar: <Monto valor={faltaCobrar} />
           </ThemedText>
         </ThemedView>
 
@@ -203,14 +215,14 @@ export default function DetallePrestamoScreen() {
               type="backgroundElement"
               style={[styles.tarjeta, vencida && styles.tarjetaVencida]}>
               <ThemedText style={styles.destacado}>
-                Cuota {cuota.numero}: {formatearPesos(cuota.monto)}
+                Cuota {cuota.numero}: <Monto valor={cuota.monto} />
               </ThemedText>
               <ThemedText style={styles.texto}>
                 Vence el {formatearFecha(cuota.fecha_vencimiento)}
               </ThemedText>
               {!pagada && cuota.monto_pagado > 0 ? (
                 <ThemedText style={styles.texto}>
-                  Ya pagó: {formatearPesos(cuota.monto_pagado)}
+                  Ya pagó: <Monto valor={cuota.monto_pagado} />
                 </ThemedText>
               ) : null}
               {pagada ? (
@@ -296,16 +308,8 @@ const styles = StyleSheet.create({
   tituloLista: {
     marginTop: Spacing.three,
   },
-  tarjeta: {
-    padding: Spacing.three,
-    borderRadius: 12,
-    borderWidth: 3,
-    borderColor: 'transparent',
-    gap: Spacing.one,
-  },
-  tarjetaVencida: {
-    borderColor: COLOR_VENCIDA,
-  },
+  tarjeta: EstiloTarjeta,
+  tarjetaVencida: bordeDestacado(COLOR_VENCIDA),
   eliminar: {
     marginTop: Spacing.five,
   },
