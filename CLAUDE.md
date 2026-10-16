@@ -89,8 +89,28 @@ Pagos y mora: `registrarPago` (`src/db/pagos.ts`) y `calcularMoraPendiente` (`sr
 Recordatorios: `src/utils/recordatorios.ts`.
 - **Carga diferida:** `expo-notifications` se carga con `require` dentro de un try/catch. Si falla (Expo Go en Android puede no tener el módulo nativo), quedan desactivados con un `console.warn`, y `_layout.tsx` oculta esos avisos con `LogBox.ignoreLogs`.
 - **Permiso:** al abrir la app se pide la primera vez, con una explicación previa.
-- **Avisos:** uno a las 9:00 por cada día de los próximos 14 con cuotas que vencen ("Hoy tenés N cobros por $X", sin mora).
-- **Reprogramación:** al abrir la app y después de crear un préstamo, registrar un pago, editar una cuota, eliminar un préstamo o cargar/borrar datos.
+- **Avisos:** uno a las 9:00 por cada día de los próximos 14 con cuotas que vencen ("Hoy tenés N cobros por $X", sin mora). El armado (hora y texto) está en `armarAvisos` (`src/utils/avisos-cobro.ts`), sin depender de expo-notifications, para poder probarlo en Node.
+- **Reprogramación:** al abrir la app y después de crear un préstamo, registrar un pago, editar una cuota, eliminar un préstamo o cliente, o cargar/borrar datos. Las reprogramaciones se encolan (de a una), para que dos seguidas no dejen avisos repetidos.
+- **Ícono del aviso en Android:** el plugin `expo-notifications` de `app.json` usa `android-icon-monochrome.png` (forma con fondo transparente) y el color `#1F6F4A`. Recién se ve en un build, no en Expo Go.
+
+## Cómo generar el APK
+Se usa EAS Build con `npx eas-cli@latest` (nada instalado global). El login y los builds los hace el usuario; Claude no los ejecuta.
+- **`eas.json`:**
+  - perfil `preview`: APK para instalar directo en el celular (`distribution: internal`, `android.buildType: apk`);
+  - perfil `production`: `.aab` para Play Store (`app-bundle`, `autoIncrement: true`);
+  - `cli.appVersionSource: remote`: el `versionCode` de Android lo lleva EAS, no `app.json`.
+- **`app.json`:**
+  - nombre "Cuaderno de Cobros", slug `cuaderno-de-cobros`, versión `1.0.0`;
+  - paquete `com.iantepper.cuadernodecobros`;
+  - ícono adaptativo (foreground, background y monochrome, fondo `#1F6F4A`);
+  - plugin `expo-notifications`. Los permisos `POST_NOTIFICATIONS` y `RECEIVE_BOOT_COMPLETED` los agrega la propia librería al manifest.
+- **Pasos (los corre el usuario):**
+  1. `npx eas-cli@latest login`.
+  2. `npx eas-cli@latest init`, la primera vez: crea el proyecto en EAS y agrega `extra.eas.projectId` a `app.json` (hay que commitear ese cambio).
+  3. `npx eas-cli@latest build --platform android --profile preview`.
+  4. Al terminar, EAS da un link y un QR para descargar el APK en el celular. Hay que permitir "instalar apps de origen desconocido".
+- **En el APK (modo producción, `__DEV__` falso):** Ajustes muestra solo "Borrar todos los datos", con doble confirmación. "Cargar datos de ejemplo" aparece únicamente en desarrollo (Expo Go o `npx expo start`).
+- **Recordatorios:** en el APK sí funcionan (incluyen el módulo nativo que a veces falta en Expo Go). Al abrir la app por primera vez aparece la explicación y el pedido de permiso de notificaciones.
 
 Notas para trabajar:
 - **Tipos de rutas:** si `npx tsc --noEmit` falla por una ruta nueva (`href` o `pathname` no asignable), reiniciar `npx expo start` para regenerar `.expo/types/router.d.ts`. El servidor de desarrollo abierto a veces los regenera mal al agregar archivos.
