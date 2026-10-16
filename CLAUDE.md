@@ -43,9 +43,10 @@ El indicador siempre muestra el texto además del color.
 **Proyecto terminado** (todas las fases completas). Nombre de la app: "Cuaderno de Cobros" (`app.json`: slug `cuaderno-de-cobros`, paquete Android `com.iantepper.cuadernodecobros`, color de marca `#1F6F4A`). Repo en GitHub: Iantepper/prestamos-app, rama `main`. El `README.md` describe la app para quien la use o la evalúe.
 
 Pantallas (`src/app/`):
-- **Agenda** (`index.tsx`): cuotas pendientes en Atrasadas, Hoy, Mañana y Próximos 7 días, con el resumen "Hoy tenés que cobrar…". Cada tarjeta tiene "Cómo llegar" (Google Maps) y "Cobrar" (`CuadroCobro`). Consulta en `src/db/agenda.ts`.
+- **Agenda** (`index.tsx`): cuotas pendientes en Atrasadas, Hoy, Mañana y Próximos 7 días, con el resumen "Hoy tenés que cobrar…". Cada tarjeta tiene "Cómo llegar" (Google Maps) y, si el cliente tiene teléfono, "Llamar", lado a lado en una fila (sin teléfono, "Cómo llegar" ocupa todo el ancho); abajo, "Cobrar" (`CuadroCobro`) a todo el ancho como acción principal. El texto "Tel: ..." se mantiene para ver el número. Consulta en `src/db/agenda.ts`.
 - **Clientes** (`clientes.tsx`): alta y lista con `IndicadorRiesgo`, con un campo "Buscar por nombre" arriba de la lista. "Editar" abre `CuadroEditarCliente`. Consultas en `src/db/clientes.ts`.
   - Al guardar uno nuevo, si ya existe otro con el mismo nombre y dirección (`existeClienteIgual`), pregunta "Ya existe un cliente igual. ¿Cargarlo de todas formas?" (Cancelar / Cargar igual).
+  - Si tiene teléfono, "Llamar" (verde relleno, a todo el ancho) va arriba de la fila "Editar" / "Eliminar".
   - "Editar" y "Eliminar" van en la misma fila; "Eliminar" usa la variante `peligroBorde`, para no ser el botón dominante.
   - "Eliminar" (`eliminarCliente`, en una transacción). Con préstamos activos no se puede (avisa "Cobralos o eliminá esos préstamos primero"). Solo con saldados: doble confirmación, y se borran también sus préstamos, cuotas y pagos (cambian los totales del Resumen). Sin préstamos: confirmación simple.
 - **Préstamos** (`prestamos/`, Stack):
@@ -58,7 +59,7 @@ Pantallas (`src/app/`):
   - `ajustes.tsx`: cargar datos de ejemplo y borrar todos los datos, con doble confirmación (`src/db/ejemplo.ts`).
 
 Componentes (`src/components/`):
-- `BotonGrande`, con variantes `principal`, `secundario`, `peligro` (rojo lleno) y `peligroBorde` (borde y texto rojos sobre blanco). Acepta `style` (por ejemplo `flex: 1` para dos botones en una fila).
+- `BotonGrande`, con variantes `principal`, `secundario`, `peligro` (rojo lleno) y `peligroBorde` (borde y texto rojos sobre blanco). Acepta `style` (por ejemplo `flex: 1` para dos botones en una fila) e `icono` (nombre de `SymbolView` de `expo-symbols`, incluido en Expo Go: `{ ios, android, web }`).
 - `CampoTexto` (acepta `ref` para poner el foco) y `OpcionGrande`.
 - `CuadroModal`: pantalla completa para formularios cortos, base de los cuadros de cobro y edición.
 - `IndicadorRiesgo`.
@@ -74,6 +75,7 @@ Convenciones de la interfaz:
 - **Encabezado:** las pantallas apiladas usan `OpcionesEncabezado` de `src/constants/theme.ts`.
 - **Confirmaciones:** cobrar, eliminar un préstamo, eliminar un cliente y borrar datos piden confirmación con `Alert`.
 - **Fechas:** en los formularios se escriben como DD/MM/AAAA (`leerFecha`).
+- **Llamar:** `llamar(telefono)` en `src/utils/llamar.ts` quita espacios, guiones y paréntesis y abre el marcador con `tel:`; si falla, avisa "No se pudo abrir el teléfono".
 - **Búsqueda de nombres:** `filtrarPorNombre` y `normalizarTexto` (`src/utils/busqueda.ts`), que no distinguen mayúsculas, acentos ni espacios de más.
 - **Montos:** se leen con `leerMonto` (acepta "10.500" o "3333,33") y se muestran con `formatearPesos`. En los totales de la pestaña Resumen (Prestado, Total cobrado, Falta cobrar) y en "Cobrado" / "Falta cobrar" de la lista de Préstamos se muestran redondeados a pesos enteros (`formatearPesos(valor, { enteros: true })` o `<Monto enteros />`). Es solo al mostrar: en la base y en el detalle del préstamo y sus cuotas los montos quedan exactos, con centavos.
 
