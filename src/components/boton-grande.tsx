@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Colors, Spacing } from '@/constants/theme';
 
@@ -9,12 +9,15 @@ type Props = {
   texto: string;
   onPress: () => void;
   // principal: verde lleno; secundario: borde verde (acciones menos importantes);
-  // peligro: rojo (acciones que no se pueden deshacer).
-  variante?: 'principal' | 'secundario' | 'peligro';
+  // peligro: rojo lleno (acción principal que no se puede deshacer);
+  // peligroBorde: borde y texto rojos sobre blanco (acción que no se puede deshacer,
+  // pero que no debe ser el botón dominante, por ejemplo "Eliminar" en una lista).
+  variante?: 'principal' | 'secundario' | 'peligro' | 'peligroBorde';
+  style?: StyleProp<ViewStyle>;
 };
 
 // Botón grande y de alto contraste para las acciones principales.
-export function BotonGrande({ texto, onPress, variante = 'principal' }: Props) {
+export function BotonGrande({ texto, onPress, variante = 'principal', style }: Props) {
   return (
     <Pressable
       onPress={onPress}
@@ -23,9 +26,16 @@ export function BotonGrande({ texto, onPress, variante = 'principal' }: Props) {
         styles.boton,
         variante === 'secundario' && styles.secundario,
         variante === 'peligro' && styles.peligro,
+        variante === 'peligroBorde' && styles.peligroBorde,
         pressed && styles.presionado,
+        style,
       ]}>
-      <Text style={[styles.texto, variante === 'secundario' && styles.textoSecundario]}>
+      <Text
+        style={[
+          styles.texto,
+          variante === 'secundario' && styles.textoSecundario,
+          variante === 'peligroBorde' && styles.textoPeligro,
+        ]}>
         {texto}
       </Text>
     </Pressable>
@@ -35,7 +45,7 @@ export function BotonGrande({ texto, onPress, variante = 'principal' }: Props) {
 const styles = StyleSheet.create({
   boton: {
     minHeight: 60,
-    paddingHorizontal: Spacing.four,
+    paddingHorizontal: Spacing.three,
     borderRadius: 14,
     borderWidth: 3,
     borderColor: COLOR_PRINCIPAL,
@@ -50,6 +60,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLOR_PELIGRO,
     borderColor: COLOR_PELIGRO,
   },
+  peligroBorde: {
+    backgroundColor: Colors.backgroundElement,
+    borderColor: COLOR_PELIGRO,
+  },
   presionado: {
     opacity: 0.8,
   },
@@ -57,8 +71,12 @@ const styles = StyleSheet.create({
     color: Colors.onPrimary,
     fontSize: 20,
     fontWeight: '700',
+    textAlign: 'center',
   },
   textoSecundario: {
     color: COLOR_PRINCIPAL,
+  },
+  textoPeligro: {
+    color: COLOR_PELIGRO,
   },
 });

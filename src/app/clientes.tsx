@@ -255,11 +255,13 @@ export default function ClientesScreen() {
                     texto="Editar"
                     variante="secundario"
                     onPress={() => setClienteAEditar(cliente)}
+                    style={styles.botonFila}
                   />
                   <BotonGrande
                     texto="Eliminar"
-                    variante="peligro"
+                    variante="peligroBorde"
                     onPress={() => confirmarEliminar(cliente)}
+                    style={styles.botonFila}
                   />
                 </View>
               </ThemedView>
@@ -301,9 +303,14 @@ const styles = StyleSheet.create({
   tituloLista: {
     marginTop: Spacing.four,
   },
+  // Editar y Eliminar lado a lado, del mismo ancho y alto.
   botones: {
     marginTop: Spacing.two,
+    flexDirection: 'row',
     gap: Spacing.two,
+  },
+  botonFila: {
+    flex: 1,
   },
   tarjeta: EstiloTarjeta,
   nombre: {
