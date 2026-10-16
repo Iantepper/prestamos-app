@@ -34,3 +34,14 @@ export async function obtenerResumen(db: SQLiteDatabase): Promise<Resumen> {
     }
   );
 }
+
+// Cantidad de clientes y de préstamos (activos y saldados), para saber si mostrar la guía inicial.
+export async function contarClientesYPrestamos(
+  db: SQLiteDatabase
+): Promise<{ clientes: number; prestamos: number }> {
+  const fila = await db.getFirstAsync<{ clientes: number; prestamos: number }>(
+    `SELECT (SELECT COUNT(*) FROM clientes) AS clientes,
+            (SELECT COUNT(*) FROM prestamos) AS prestamos`
+  );
+  return fila ?? { clientes: 0, prestamos: 0 };
+}

@@ -1,7 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useCallback, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BotonGrande } from '@/components/boton-grande';
@@ -9,6 +9,7 @@ import { CampoTexto } from '@/components/campo-texto';
 import { CuadroEditarCliente } from '@/components/cuadro-editar-cliente';
 import { IndicadorRiesgo } from '@/components/indicador-riesgo';
 import { EncabezadoPantalla } from '@/components/encabezado-pantalla';
+import { GuiaPasos } from '@/components/guia-pasos';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, EstiloTarjeta, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -33,6 +34,8 @@ export default function ClientesScreen() {
   const [notas, setNotas] = useState('');
   const [errores, setErrores] = useState<Errores>({});
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const scrollRef = useRef<ScrollView>(null);
+  const nombreRef = useRef<TextInput>(null);
   const [perfiles, setPerfiles] = useState<Map<number, NivelRiesgo>>(new Map());
   const [recarga, setRecarga] = useState(0);
   const [clienteAEditar, setClienteAEditar] = useState<Cliente | null>(null);
@@ -96,6 +99,7 @@ export default function ClientesScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.contenido}
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets>
@@ -106,6 +110,7 @@ export default function ClientesScreen() {
           <ThemedText type="subtitle">Nuevo cliente</ThemedText>
 
           <CampoTexto
+            ref={nombreRef}
             etiqueta="Nombre *"
             value={nombre}
             onChangeText={setNombre}
@@ -143,7 +148,22 @@ export default function ClientesScreen() {
             Clientes guardados
           </ThemedText>
           {clientes.length === 0 ? (
-            <ThemedText style={styles.dato}>Todavía no cargaste clientes</ThemedText>
+            <GuiaPasos
+              titulo="Todavía no cargaste clientes"
+              pasos={[
+                {
+                  texto: 'Completá el formulario de arriba: nombre y dirección',
+                  boton: {
+                    texto: 'Cargar mi primer cliente',
+                    onPress: () => {
+                      scrollRef.current?.scrollTo({ y: 0, animated: true });
+                      nombreRef.current?.focus();
+                    },
+                  },
+                },
+                { texto: 'Tocá "Guardar cliente" y va a aparecer acá' },
+              ]}
+            />
           ) : (
             clientes.map((cliente) => (
               <ThemedView key={cliente.id} type="backgroundElement" style={styles.tarjeta}>

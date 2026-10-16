@@ -1,5 +1,5 @@
 // Agenda de cobros: cuotas atrasadas, de hoy, de mañana y de los próximos 7 días.
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, View } from 'react-native';
@@ -9,6 +9,7 @@ import { BotonGrande } from '@/components/boton-grande';
 import { CuadroCobro, textoDias } from '@/components/cuadro-cobro';
 import { Monto } from '@/components/monto';
 import { EncabezadoPantalla } from '@/components/encabezado-pantalla';
+import { GuiaPasos } from '@/components/guia-pasos';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import {
@@ -21,6 +22,7 @@ import {
 } from '@/constants/theme';
 import { listarCobrosPendientes, type CobroPendiente } from '@/db/agenda';
 import { registrarPago } from '@/db/pagos';
+import { contarClientesYPrestamos } from '@/db/resumen';
 import { formatearFecha, hoyISO, sumarDias } from '@/utils/formato';
 import { calcularMoraPendiente } from '@/utils/mora';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
@@ -36,6 +38,10 @@ type Grupo = { titulo: string; atrasadas: boolean; color: string | null; cobros:
 export default function AgendaScreen() {
   const db = useSQLiteContext();
   const [filas, setFilas] = useState<CobroPendiente[]>([]);
+  // null mientras carga, para no mostrar la guía un instante antes de los datos.
+  const [cantidades, setCantidades] = useState<{ clientes: number; prestamos: number } | null>(
+    null
+  );
   const [hoy, setHoy] = useState(hoyISO);
   const [recarga, setRecarga] = useState(0);
   const [cobroACobrar, setCobroACobrar] = useState<Cobro | null>(null);
@@ -46,10 +52,14 @@ export default function AgendaScreen() {
     useCallback(() => {
       let activo = true;
       const fechaHoy = hoyISO();
-      listarCobrosPendientes(db, sumarDias(fechaHoy, 7)).then((resultado) => {
+      Promise.all([
+        listarCobrosPendientes(db, sumarDias(fechaHoy, 7)),
+        contarClientesYPrestamos(db),
+      ]).then(([resultado, totales]) => {
         if (!activo) return;
         setHoy(fechaHoy);
         setFilas(resultado);
+        setCantidades(totales);
       });
       return () => {
         activo = false;
@@ -123,7 +133,29 @@ export default function AgendaScreen() {
             descripcion="Lo que tenés que cobrar hoy y en los próximos días."
           />
 
-          {cobros.length === 0 ? (
+          {cantidades && cantidades.prestamos === 0 ? (
+            <GuiaPasos
+              titulo="Para empezar"
+              pasos={[
+                {
+                  texto: 'Cargá un cliente',
+                  hecho: cantidades.clientes > 0,
+                  boton: {
+                    texto: 'Cargar mi primer cliente',
+                    onPress: () => router.navigate('/clientes'),
+                  },
+                },
+                {
+                  texto: 'Creá un préstamo',
+                  boton: {
+                    texto: 'Crear un préstamo',
+                    onPress: () => router.navigate('/prestamos'),
+                  },
+                },
+                { texto: 'Cobrá desde la Agenda: las cuotas van a aparecer acá' },
+              ]}
+            />
+          ) : cobros.length === 0 ? (
             <ThemedText style={styles.texto}>No tenés cobros para estos días</ThemedText>
           ) : (
             <>

@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -10,6 +10,7 @@ import { IndicadorRiesgo } from '@/components/indicador-riesgo';
 import { Monto } from '@/components/monto';
 import { OpcionGrande } from '@/components/opcion-grande';
 import { EncabezadoPantalla } from '@/components/encabezado-pantalla';
+import { GuiaPasos } from '@/components/guia-pasos';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import {
@@ -53,6 +54,7 @@ type Errores = {
 export default function PrestamosScreen() {
   const db = useSQLiteContext();
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const scrollRef = useRef<ScrollView>(null);
   const [clienteId, setClienteId] = useState<number | null>(null);
   const [monto, setMonto] = useState('');
   const [tasa, setTasa] = useState('');
@@ -146,6 +148,7 @@ export default function PrestamosScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.contenido}
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets>
@@ -156,9 +159,19 @@ export default function PrestamosScreen() {
           <ThemedText type="subtitle">Nuevo préstamo</ThemedText>
 
           {clientes.length === 0 ? (
-            <ThemedText style={styles.texto}>
-              Primero cargá un cliente en la pestaña Clientes.
-            </ThemedText>
+            <GuiaPasos
+              titulo="Para dar un préstamo"
+              pasos={[
+                {
+                  texto: 'Primero cargá al cliente',
+                  boton: {
+                    texto: 'Cargar mi primer cliente',
+                    onPress: () => router.navigate('/clientes'),
+                  },
+                },
+                { texto: 'Volvé a esta pantalla y creá el préstamo' },
+              ]}
+            />
           ) : (
             <>
               <View style={styles.grupo}>
@@ -276,12 +289,27 @@ export default function PrestamosScreen() {
               style={styles.opcionSelector}
             />
           </View>
-          {prestamos.length === 0 ? (
+          {prestamos.length === 0 && verSaldados ? (
             <ThemedText style={styles.texto}>
-              {verSaldados
-                ? 'Todavía no hay préstamos saldados'
-                : 'Todavía no hay préstamos activos'}
+              Todavía no hay préstamos saldados. Cuando un cliente pague todas las cuotas, el
+              préstamo aparece acá.
             </ThemedText>
+          ) : prestamos.length === 0 && clientes.length > 0 ? (
+            <GuiaPasos
+              titulo="Todavía no hay préstamos activos"
+              pasos={[
+                {
+                  texto: 'Elegí el cliente y completá monto, interés y cuotas',
+                  boton: {
+                    texto: 'Crear un préstamo',
+                    onPress: () => scrollRef.current?.scrollTo({ y: 0, animated: true }),
+                  },
+                },
+                { texto: 'Tocá "Guardar préstamo": las cuotas van a aparecer en la Agenda' },
+              ]}
+            />
+          ) : prestamos.length === 0 ? (
+            <ThemedText style={styles.texto}>Todavía no hay préstamos activos</ThemedText>
           ) : (
             prestamos.map((prestamo) => (
               <Pressable

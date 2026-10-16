@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BotonGrande } from '@/components/boton-grande';
 import { EncabezadoPantalla } from '@/components/encabezado-pantalla';
+import { GuiaPasos } from '@/components/guia-pasos';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import {
@@ -72,10 +73,26 @@ export default function ResumenScreen() {
           />
 
           {resumen && resumen.prestamos_activos + resumen.prestamos_saldados === 0 ? (
-            <ThemedText style={styles.titulo}>
-              Todavía no cargaste préstamos. Cuando cargues uno en la pestaña Préstamos, acá vas a
-              ver las cuentas.
-            </ThemedText>
+            <GuiaPasos
+              titulo="Todavía no hay cuentas para mostrar"
+              pasos={[
+                {
+                  texto: 'Cargá un cliente',
+                  boton: {
+                    texto: 'Cargar mi primer cliente',
+                    onPress: () => router.navigate('/clientes'),
+                  },
+                },
+                {
+                  texto: 'Creá un préstamo',
+                  boton: {
+                    texto: 'Crear un préstamo',
+                    onPress: () => router.navigate('/prestamos'),
+                  },
+                },
+                { texto: 'Acá vas a ver lo prestado, lo cobrado y lo que falta' },
+              ]}
+            />
           ) : resumen ? (
             <>
               <Tarjeta

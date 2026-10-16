@@ -1,3 +1,4 @@
+import type { Ref } from 'react';
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -9,16 +10,18 @@ const COLOR_ERROR = Colors.danger;
 type Props = TextInputProps & {
   etiqueta: string;
   error?: string;
+  ref?: Ref<TextInput>; // para poner el foco en el campo desde afuera
 };
 
 // Campo de formulario con letra grande, pensado para un usuario mayor.
-export function CampoTexto({ etiqueta, error, style, ...rest }: Props) {
+export function CampoTexto({ etiqueta, error, style, ref, ...rest }: Props) {
   const theme = useTheme();
 
   return (
     <View style={styles.contenedor}>
       <ThemedText style={styles.etiqueta}>{etiqueta}</ThemedText>
       <TextInput
+        ref={ref}
         placeholderTextColor={theme.textSecondary}
         style={[
           styles.input,
