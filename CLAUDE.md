@@ -45,6 +45,7 @@ El indicador siempre muestra el texto además del color.
 Pantallas (`src/app/`):
 - **Agenda** (`index.tsx`): cuotas pendientes en Atrasadas, Hoy, Mañana y Próximos 7 días, con el resumen "Hoy tenés que cobrar…". Cada tarjeta tiene "Cómo llegar" (Google Maps) y "Cobrar" (`CuadroCobro`). Consulta en `src/db/agenda.ts`.
 - **Clientes** (`clientes.tsx`): alta y lista con `IndicadorRiesgo`. "Editar" abre `CuadroEditarCliente`. Consultas en `src/db/clientes.ts`.
+  - "Eliminar" (`eliminarCliente`, en una transacción). Con préstamos activos no se puede (avisa "Cobralos o eliminá esos préstamos primero"). Solo con saldados: doble confirmación, y se borran también sus préstamos, cuotas y pagos (cambian los totales del Resumen). Sin préstamos: confirmación simple.
 - **Préstamos** (`prestamos/`, Stack):
   - `index.tsx`: alta, eligiendo el cliente con `OpcionGrande` + perfil, con aviso si es Riesgo. Lista con botones "Activos" / "Saldados".
   - `[id].tsx`: detalle con saldo y cuotas. Cada cuota pendiente tiene "Cobrar" y "Editar" (`CuadroEditarCuota`). "Eliminar préstamo" aparece solo sin pagos (`eliminarPrestamoSinPagos`).
@@ -55,14 +56,20 @@ Pantallas (`src/app/`):
 
 Componentes (`src/components/`):
 - `BotonGrande`, con variantes `principal`, `secundario` y `peligro`.
-- `CampoTexto` y `OpcionGrande`.
+- `CampoTexto` (acepta `ref` para poner el foco) y `OpcionGrande`.
 - `CuadroModal`: pantalla completa para formularios cortos, base de los cuadros de cobro y edición.
 - `IndicadorRiesgo`.
+- `EncabezadoPantalla`: título grande y una línea que explica la pantalla (Agenda, Clientes, Préstamos, Resumen).
+- `GuiaPasos`: pasos numerados con botones para los estados vacíos.
+- `Monto`: monto en negrita dentro de un texto.
+- Barra de pestañas (`app-tabs.tsx`): NativeTabs con `labelVisibilityMode="labeled"` (nombre siempre visible, 14 px) e íconos `md` (Material Symbols, Android) / `sf` (iOS).
 
 Convenciones de la interfaz:
-- **Texto:** `ThemedText` tiene 20 px por defecto; ningún texto baja de 18 px.
+- **Colores:** un solo tema claro en `Colors` (`src/constants/theme.ts`): fondo `#FFFAF0`, tarjetas `#FFFFFF` con borde `#E6DFD0`, texto `#1B1B1B` / `#5A5A5A`, principal `#1F6F4A`, hoy `#B7791F`, peligro/atrasado `#B3261E`. Los niveles de riesgo usan `ColoresRiesgo`. No usar colores sueltos en los componentes.
+- **Tarjetas:** `EstiloTarjeta` (radio 16, borde fino, sombra suave); `bordeDestacado(color)` para resaltar (atrasada, hoy, aviso).
+- **Texto:** `ThemedText` tiene 20 px por defecto; ningún texto baja de 18 px (salvo los nombres de las pestañas, 14 px).
 - **Encabezado:** las pantallas apiladas usan `OpcionesEncabezado` de `src/constants/theme.ts`.
-- **Confirmaciones:** cobrar, eliminar un préstamo y borrar datos piden confirmación con `Alert`.
+- **Confirmaciones:** cobrar, eliminar un préstamo, eliminar un cliente y borrar datos piden confirmación con `Alert`.
 - **Fechas:** en los formularios se escriben como DD/MM/AAAA (`leerFecha`).
 - **Montos:** se leen con `leerMonto` (acepta "10.500" o "3333,33") y se muestran con `formatearPesos`.
 

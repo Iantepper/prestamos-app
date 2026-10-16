@@ -15,13 +15,16 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, EstiloTarjeta, MaxContentWidth, Spacing } from '@/constants/theme';
 import {
   actualizarCliente,
+  contarPrestamosDeCliente,
   crearCliente,
+  eliminarCliente,
   listarClientes,
   type Cliente,
   type ClienteNuevo,
 } from '@/db/clientes';
 import { obtenerPerfilesRiesgo } from '@/db/riesgo';
 import { hoyISO } from '@/utils/formato';
+import { reprogramarRecordatorios } from '@/utils/recordatorios';
 import type { NivelRiesgo } from '@/utils/riesgo';
 
 type Errores = { nombre?: string; direccion?: string };
@@ -93,6 +96,75 @@ export default function ClientesScreen() {
     setClienteAEditar(null);
     setRecarga((r) => r + 1);
     Alert.alert('Cliente actualizado');
+  };
+
+  const eliminar = async (cliente: Cliente) => {
+    try {
+      const eliminado = await eliminarCliente(db, cliente.id);
+      if (!eliminado) {
+        Alert.alert(
+          'No se puede eliminar',
+          'Este cliente tiene préstamos activos. Cobralos o eliminá esos préstamos primero.'
+        );
+        return;
+      }
+    } catch {
+      Alert.alert('No se pudo eliminar', 'Probá de nuevo.');
+      return;
+    }
+    setRecarga((r) => r + 1);
+    reprogramarRecordatorios(db);
+    Alert.alert('Cliente eliminado');
+  };
+
+  // Sin préstamos: confirmación simple. Con préstamos saldados: doble confirmación, porque
+  // también se borra su historial. Con préstamos activos: no se puede.
+  const confirmarEliminar = async (cliente: Cliente) => {
+    let prestamos;
+    try {
+      prestamos = await contarPrestamosDeCliente(db, cliente.id);
+    } catch {
+      Alert.alert('No se pudo eliminar', 'Probá de nuevo.');
+      return;
+    }
+    if (prestamos.activos > 0) {
+      Alert.alert(
+        'No se puede eliminar',
+        'Este cliente tiene préstamos activos. Cobralos o eliminá esos préstamos primero.'
+      );
+      return;
+    }
+    if (prestamos.saldados === 0) {
+      Alert.alert(`¿Eliminar a ${cliente.nombre}?`, 'No se puede deshacer.', [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Eliminar', style: 'destructive', onPress: () => eliminar(cliente) },
+      ]);
+      return;
+    }
+    const cuantos =
+      prestamos.saldados === 1
+        ? 'su préstamo saldado'
+        : `sus ${prestamos.saldados} préstamos saldados`;
+    Alert.alert(
+      `¿Eliminar a ${cliente.nombre} y todo su historial?`,
+      `También se van a borrar ${cuantos}, con todas sus cuotas y pagos. Lo cobrado deja de aparecer en el Resumen.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sí, eliminar',
+          style: 'destructive',
+          onPress: () =>
+            Alert.alert(
+              'Última confirmación',
+              `Se borra ${cliente.nombre} con todo su historial. Esto no se puede deshacer.`,
+              [
+                { text: 'Cancelar', style: 'cancel' },
+                { text: 'Eliminar todo', style: 'destructive', onPress: () => eliminar(cliente) },
+              ]
+            ),
+        },
+      ]
+    );
   };
 
   return (
@@ -184,6 +256,11 @@ export default function ClientesScreen() {
                     variante="secundario"
                     onPress={() => setClienteAEditar(cliente)}
                   />
+                  <BotonGrande
+                    texto="Eliminar"
+                    variante="peligro"
+                    onPress={() => confirmarEliminar(cliente)}
+                  />
                 </View>
               </ThemedView>
             ))
@@ -226,6 +303,7 @@ const styles = StyleSheet.create({
   },
   botones: {
     marginTop: Spacing.two,
+    gap: Spacing.two,
   },
   tarjeta: EstiloTarjeta,
   nombre: {

@@ -14,7 +14,8 @@ Trabajo práctico de Seminario (UTN). Todo funciona en el celular, sin internet,
 - **Clientes**:
   - alta con nombre, teléfono, dirección y notas;
   - lista con el perfil de riesgo de cada uno (Cumplidor, Con atrasos, Riesgo, Nuevo);
-  - edición de los datos.
+  - edición de los datos;
+  - eliminación: no se puede si tiene préstamos activos; si solo tiene saldados, se borra también su historial (con doble confirmación).
 - **Préstamos**:
   - alta eligiendo el cliente, con vista previa de las cuotas ("Vas a devolver $X en N cuotas de $Y") y aviso si el cliente tiene perfil Riesgo;
   - listas de préstamos activos y saldados.
@@ -109,5 +110,5 @@ El indicador siempre muestra el texto además del color.
 - **Recordatorios en Expo Go:** las notificaciones locales dependen de `expo-notifications`. En algunas versiones de Expo Go en Android falta un módulo nativo y no se pueden usar; en ese caso los recordatorios se desactivan solos y el resto de la app funciona igual. Para tenerlos siempre hace falta una *development build* (`npx eas-cli@latest build --profile development`).
 - **Demora de los avisos en Android:** sin el permiso de alarmas exactas, el aviso de las 9:00 puede llegar unos minutos tarde.
 - **Datos solo en el celular:** si se desinstala Expo Go o la app, se pierden. No hay copia de seguridad ni sincronización.
-- **Clientes y pagos sin borrado:** no se pueden eliminar clientes ni pagos registrados; solo préstamos sin pagos.
+- **Pagos sin borrado:** no se puede anular un pago registrado. Un préstamo se puede eliminar solo si no tiene pagos, y un cliente solo si no tiene préstamos activos.
 - **Fechas a mano:** en los formularios se escriben como día/mes/año (no hay calendario para elegirlas).

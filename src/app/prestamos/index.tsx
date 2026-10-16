@@ -81,6 +81,7 @@ export default function PrestamosScreen() {
       ]).then(([filasClientes, filasPrestamos, perfilesClientes]) => {
         if (!activo) return;
         setClientes(filasClientes);
+        setClienteId((id) => (filasClientes.some((c) => c.id === id) ? id : null));
         setPrestamos(filasPrestamos);
         setPerfiles(perfilesClientes);
       });
