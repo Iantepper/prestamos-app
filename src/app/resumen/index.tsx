@@ -97,18 +97,21 @@ export default function ResumenScreen() {
             <>
               <Tarjeta
                 titulo="Prestado (préstamos activos)"
-                valor={formatearPesos(resumen.total_prestado)}
+                valor={formatearPesos(resumen.total_prestado, { enteros: true })}
               />
               <Tarjeta
                 titulo="Total cobrado"
-                valor={formatearPesos(resumen.total_cobrado)}
+                valor={formatearPesos(resumen.total_cobrado, { enteros: true })}
                 detalle={
                   resumen.mora_cobrada > 0
                     ? `Incluye ${formatearPesos(resumen.mora_cobrada)} de recargos por mora`
                     : undefined
                 }
               />
-              <Tarjeta titulo="Falta cobrar" valor={formatearPesos(resumen.falta_cobrar)} />
+              <Tarjeta
+                titulo="Falta cobrar"
+                valor={formatearPesos(resumen.falta_cobrar, { enteros: true })}
+              />
               <Tarjeta
                 titulo="Cuotas atrasadas"
                 valor={

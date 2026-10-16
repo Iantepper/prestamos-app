@@ -365,10 +365,10 @@ export default function PrestamosScreen() {
                     Cuotas pagas: {prestamo.cuotas_pagadas} de {prestamo.cant_cuotas}
                   </ThemedText>
                   <ThemedText style={styles.texto}>
-                    Cobrado: <Monto valor={prestamo.cobrado} />
+                    Cobrado: <Monto valor={prestamo.cobrado} enteros />
                   </ThemedText>
                   <ThemedText style={styles.texto}>
-                    Falta cobrar: <Monto valor={prestamo.falta_cobrar} />
+                    Falta cobrar: <Monto valor={prestamo.falta_cobrar} enteros />
                   </ThemedText>
                   {prestamo.proximo_vencimiento ? (
                     <ThemedText style={styles.texto}>

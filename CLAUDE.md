@@ -75,7 +75,7 @@ Convenciones de la interfaz:
 - **Confirmaciones:** cobrar, eliminar un préstamo, eliminar un cliente y borrar datos piden confirmación con `Alert`.
 - **Fechas:** en los formularios se escriben como DD/MM/AAAA (`leerFecha`).
 - **Búsqueda de nombres:** `filtrarPorNombre` y `normalizarTexto` (`src/utils/busqueda.ts`), que no distinguen mayúsculas, acentos ni espacios de más.
-- **Montos:** se leen con `leerMonto` (acepta "10.500" o "3333,33") y se muestran con `formatearPesos`.
+- **Montos:** se leen con `leerMonto` (acepta "10.500" o "3333,33") y se muestran con `formatearPesos`. En los totales de la pestaña Resumen (Prestado, Total cobrado, Falta cobrar) y en "Cobrado" / "Falta cobrar" de la lista de Préstamos se muestran redondeados a pesos enteros (`formatearPesos(valor, { enteros: true })` o `<Monto enteros />`). Es solo al mostrar: en la base y en el detalle del préstamo y sus cuotas los montos quedan exactos, con centavos.
 
 Pagos y mora: `registrarPago` (`src/db/pagos.ts`) y `calcularMoraPendiente` (`src/utils/mora.ts`).
 - **Recargo:** monto de la cuota × mora % diaria × días de atraso, menos la mora ya cobrada de esa cuota.

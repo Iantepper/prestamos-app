@@ -2,7 +2,10 @@
 // Formato de montos y fechas para mostrar en pantalla y leer de los formularios.
 
 // Formato argentino: $ 100.000 (con centavos solo si los hay: $ 1.333,33).
-export function formatearPesos(valor: number): string {
+// Con { enteros: true } redondea a pesos enteros ($ 1.136.667), solo para mostrar: se usa en
+// los totales de los resúmenes, donde los centavos no aportan.
+export function formatearPesos(valor: number, opciones?: { enteros?: boolean }): string {
+  if (opciones?.enteros) valor = Math.round(valor);
   const [entero, decimales] = Math.abs(valor).toFixed(2).split('.');
   const conPuntos = entero.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   const signo = valor < 0 ? '-' : '';

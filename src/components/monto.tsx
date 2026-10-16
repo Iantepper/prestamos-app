@@ -3,8 +3,9 @@ import { StyleSheet, Text } from 'react-native';
 import { formatearPesos } from '@/utils/formato';
 
 // Monto en pesos en negrita, para usar dentro de un texto: "Prestado: <Monto valor={...} />".
-export function Monto({ valor }: { valor: number }) {
-  return <Text style={styles.monto}>{formatearPesos(valor)}</Text>;
+// `enteros` lo muestra redondeado a pesos enteros (ver formatearPesos).
+export function Monto({ valor, enteros }: { valor: number; enteros?: boolean }) {
+  return <Text style={styles.monto}>{formatearPesos(valor, { enteros })}</Text>;
 }
 
 const styles = StyleSheet.create({
