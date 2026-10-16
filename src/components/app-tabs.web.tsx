@@ -60,7 +60,7 @@ export function CustomTabList(props: TabListProps) {
     <View {...props} style={styles.tabListContainer}>
       <ThemedView type="backgroundElement" style={styles.innerContainer}>
         <ThemedText type="smallBold" style={styles.brandText}>
-          Préstamos
+          Cuaderno de Cobros
         </ThemedText>
 
         {props.children}
