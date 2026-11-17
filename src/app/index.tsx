@@ -7,7 +7,8 @@ import { Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BotonGrande } from '@/components/boton-grande';
-import { CuadroCobro, textoDias } from '@/components/cuadro-cobro';
+import { textoDias } from '@/components/cuadro-cobro';
+import { CuadroCobroCliente } from '@/components/cuadro-cobro-cliente';
 import { avisar } from '@/components/dialogos';
 import { Monto } from '@/components/monto';
 import { EncabezadoPantalla } from '@/components/encabezado-pantalla';
@@ -23,9 +24,9 @@ import {
   Spacing,
 } from '@/constants/theme';
 import { listarCobrosPendientes, type CobroPendiente } from '@/db/agenda';
-import { registrarPago } from '@/db/pagos';
+import { registrarPagoCliente } from '@/db/pagos';
 import { contarClientesYPrestamos } from '@/db/resumen';
-import { agruparPorCliente, type Seccion } from '@/utils/agenda';
+import { agruparPorCliente, type CobroCliente, type Seccion } from '@/utils/agenda';
 import { formatearDiaMes, hoyISO, sumarDias } from '@/utils/formato';
 import { llamar } from '@/utils/llamar';
 import { calcularMoraPendiente } from '@/utils/mora';
@@ -53,7 +54,7 @@ export default function AgendaScreen() {
   );
   const [hoy, setHoy] = useState(hoyISO);
   const [recarga, setRecarga] = useState(0);
-  const [cobroACobrar, setCobroACobrar] = useState<Cobro | null>(null);
+  const [clienteACobrar, setClienteACobrar] = useState<CobroCliente<Cobro> | null>(null);
 
   // Se recarga cada vez que se entra a la pestaña (por si se cargó un préstamo o un pago)
   // y después de cobrar desde acá.
@@ -96,14 +97,15 @@ export default function AgendaScreen() {
   const deHoy = cobros.filter((c) => c.fecha_vencimiento === hoy);
   const porCliente = agruparPorCliente(cobros, hoy);
 
-  const cobrar = async (cobro: Cobro, pago: { monto: number; mora: number }) => {
+  // Lo que paga el cliente se reparte solo entre sus cuotas, de la más vieja a la más nueva.
+  const cobrar = async (grupo: CobroCliente<Cobro>, monto: number) => {
     try {
-      await registrarPago(db, { cuotaId: cobro.cuota_id, fecha: hoyISO(), ...pago });
+      await registrarPagoCliente(db, grupo.clienteId, monto, hoyISO());
     } catch {
       avisar('No se pudo guardar', 'Probá de nuevo.');
       return;
     }
-    setCobroACobrar(null);
+    setClienteACobrar(null);
     setRecarga((r) => r + 1);
     reprogramarRecordatorios(db);
     avisar('Pago registrado');
@@ -226,7 +228,7 @@ export default function AgendaScreen() {
                                 />
                               ) : null}
                             </View>
-                            <BotonGrande texto="Cobrar" onPress={() => setCobroACobrar(cliente)} />
+                            <BotonGrande texto="Cobrar" onPress={() => setClienteACobrar(grupo)} />
                           </View>
                         </ThemedView>
                       );
@@ -239,16 +241,14 @@ export default function AgendaScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {cobroACobrar ? (
-        <CuadroCobro
-          numeroCuota={cobroACobrar.numero}
-          cliente={cobroACobrar.cliente_nombre}
-          montoCuota={cobroACobrar.monto}
-          montoPagado={cobroACobrar.monto_pagado}
-          diasAtraso={cobroACobrar.diasAtraso}
-          recargo={cobroACobrar.recargo}
-          onConfirmar={(pago) => cobrar(cobroACobrar, pago)}
-          onCancelar={() => setCobroACobrar(null)}
+      {clienteACobrar ? (
+        <CuadroCobroCliente
+          clienteId={clienteACobrar.clienteId}
+          cliente={clienteACobrar.cuotas[0].cliente_nombre}
+          // Si no hay nada vencido ni de hoy, se propone la próxima cuota.
+          montoInicial={clienteACobrar.cobrarAhora || clienteACobrar.despues}
+          onConfirmar={(monto) => cobrar(clienteACobrar, monto)}
+          onCancelar={() => setClienteACobrar(null)}
         />
       ) : null}
     </ThemedView>
