@@ -55,14 +55,21 @@ El indicador siempre muestra el texto además del color. Ya no se usan los umbra
 Decidido: esperar al resultado de la prueba del aviso de las 9:00 antes de implementarlo.
 
 Pantallas (`src/app/`):
-- **Agenda** (`index.tsx`): cuotas pendientes en Atrasadas, Hoy, Mañana y Próximos 7 días, con el resumen "Hoy tenés que cobrar…". Cada tarjeta tiene "Cómo llegar" (Google Maps) y, si el cliente tiene teléfono, "Llamar", lado a lado en una fila (sin teléfono, "Cómo llegar" ocupa todo el ancho); abajo, "Cobrar" (`CuadroCobro`) a todo el ancho como acción principal. El texto "Tel: ..." se mantiene para ver el número. Consulta en `src/db/agenda.ts`.
+- **Agenda** (`index.tsx`): una tarjeta por cliente (no por cuota), en la sección más urgente que le corresponda: Atrasadas, Hoy, Mañana o Próximos 7 días (`agruparPorCliente` en `src/utils/agenda.ts`).
+  - **Tarjeta:** "Cobrar ahora: $X" (atrasadas más las de hoy), la cantidad de cuotas y hace cuánto venció la más vieja; si tiene cuotas futuras en la ventana, "Después: $Y el DD/MM" (si no hay nada para cobrar ahora, "Cobrar: $Y el DD/MM").
+  - **Botones:** dirección, "Cómo llegar" y "Llamar" lado a lado (sin teléfono, "Cómo llegar" ocupa todo el ancho), y "Cobrar" a todo el ancho, que abre `CuadroCobroCliente`.
+  - **Resumen de arriba:** "Hoy tenés que cobrar…" sigue contando cuotas.
+  - Consulta en `src/db/agenda.ts`.
 - **Clientes** (`clientes.tsx`): alta y lista con `IndicadorRiesgo`, con un campo "Buscar por nombre" arriba de la lista. "Editar" abre `CuadroEditarCliente`. Consultas en `src/db/clientes.ts`.
+  - Los que tienen préstamo activo muestran "Debe en total: $X" (cuotas pendientes, en pesos enteros) y, si hay algo vencido, "Vencido: $Y" en rojo (`obtenerDeudasClientes`).
   - Al guardar uno nuevo, si ya existe otro con el mismo nombre y dirección (`existeClienteIgual`), pregunta "Ya existe un cliente igual. ¿Cargarlo de todas formas?" (Cancelar / Cargar igual).
   - Si tiene teléfono, "Llamar" (verde relleno, a todo el ancho) va arriba de la fila "Editar" / "Eliminar".
   - "Editar" y "Eliminar" van en la misma fila; "Eliminar" usa la variante `peligroBorde`, para no ser el botón dominante.
   - "Eliminar" (`eliminarCliente`, en una transacción). Con préstamos activos no se puede (avisa "Cobralos o eliminá esos préstamos primero"). Solo con saldados: doble confirmación, y se borran también sus préstamos, cuotas y pagos (cambian los totales del Resumen). Sin préstamos: confirmación simple.
 - **Préstamos** (`prestamos/`, Stack):
   - `index.tsx`: alta, eligiendo el cliente con `OpcionGrande` + perfil, con aviso si es Riesgo. Lista con botones "Activos" / "Saldados".
+    - **Un préstamo activo por cliente:** `crearPrestamo` lanza `ClienteConPrestamoActivoError` si el cliente ya tiene uno. En el alta, esos clientes muestran "Ya tiene un préstamo" y al tocarlos aparece el aviso "Este cliente ya tiene un préstamo activo. Podés renovarlo desde el detalle de su préstamo." Los datos existentes no se tocaron.
+    - No hay campo de mora (ver "Decisión de negocio: sin recargo por mora").
     - Elección del cliente: campo "Buscar por nombre". Con más de 5 clientes se muestran solo los 5 primeros que coinciden (`MAX_CLIENTES_VISIBLES`), con el texto "Escribí el nombre para encontrar a otros". El cliente elegido se sigue mostrando aunque cambie la búsqueda.
   - `[id].tsx`: detalle con saldo y cuotas. Cada cuota pendiente tiene "Cobrar" y "Editar" (`CuadroEditarCuota`). "Eliminar préstamo" aparece solo sin pagos (`eliminarPrestamoSinPagos`).
   - Consultas en `src/db/prestamos.ts`.
@@ -74,6 +81,8 @@ Componentes (`src/components/`):
 - `BotonGrande`, con variantes `principal`, `secundario`, `peligro` (rojo lleno) y `peligroBorde` (borde y texto rojos sobre blanco). Acepta `style` (por ejemplo `flex: 1` para dos botones en una fila) e `icono` (nombre de `SymbolView` de `expo-symbols`, incluido en Expo Go: `{ ios, android, web }`).
 - `CampoTexto` (acepta `ref` para poner el foco) y `OpcionGrande`.
 - `CuadroModal`: pantalla completa para formularios cortos, base de los cuadros de cobro y edición.
+- `CuadroCobroCliente`: cobro por cliente desde la Agenda. "¿Cuánto te pagó?" viene cargado con "Cobrar ahora", muestra "Se aplica a:" con el reparto (por ejemplo "Cuota 3: completa", "Cuota 4: $5.000 de $30.000") y pide confirmación. El "Cobrar" por cuota del detalle sigue usando `CuadroCobro`.
+- `DialogosProvider` (`src/components/dialogos.tsx`, montado en `_layout.tsx`): cuadros propios de confirmación y aviso que reemplazan a `Alert.alert` (no usar `Alert.alert`). `useConfirmar()` devuelve una promesa con `true`/`false`; `useAviso()`, un aviso con un solo botón "Entendido". Fuera de los componentes se usan `confirmar` y `avisar`. Estética: cuadro centrado, blanco, borde de 2 px, fondo oscurecido, título 26 px, mensaje 22 px, botones apilados de 64 px y letra de 22 px. "No, volver" va arriba en verde relleno y la confirmación abajo (roja con borde si es destructiva). Los pedidos se encolan y se muestran de a uno.
 - `IndicadorRiesgo`.
 - `EncabezadoPantalla`: título grande y una línea que explica la pantalla (Agenda, Clientes, Préstamos, Resumen).
 - `GuiaPasos`: pasos numerados con botones para los estados vacíos.
@@ -85,7 +94,7 @@ Convenciones de la interfaz:
 - **Tarjetas:** `EstiloTarjeta` (radio 16, borde fino, sombra suave); `bordeDestacado(color)` para resaltar (atrasada, hoy, aviso).
 - **Texto:** `ThemedText` tiene 20 px por defecto; ningún texto baja de 18 px (salvo los nombres de las pestañas, 14 px).
 - **Encabezado:** las pantallas apiladas usan `OpcionesEncabezado` de `src/constants/theme.ts`.
-- **Confirmaciones:** cobrar, eliminar un préstamo, eliminar un cliente y borrar datos piden confirmación con `Alert`.
+- **Confirmaciones:** cobrar, eliminar un préstamo, eliminar un cliente y borrar datos piden confirmación con `useConfirmar` (cuadro propio, no `Alert.alert`).
 - **Fechas:** en los formularios se escriben como DD/MM/AAAA (`leerFecha`).
 - **Llamar:** `llamar(telefono)` en `src/utils/llamar.ts` quita espacios, guiones y paréntesis y abre el marcador con `tel:`; si falla, avisa "No se pudo abrir el teléfono".
 - **Búsqueda de nombres:** `filtrarPorNombre` y `normalizarTexto` (`src/utils/busqueda.ts`), que no distinguen mayúsculas, acentos ni espacios de más.
@@ -95,6 +104,7 @@ Pagos y mora: `registrarPago` (`src/db/pagos.ts`) y `calcularMoraPendiente` (`sr
 - **Recargo:** monto de la cuota × mora % diaria × días de atraso, menos la mora ya cobrada de esa cuota.
 - **Reparto:** lo cobrado cubre primero el recargo; `pagos.mora` es esa parte y `pagos.monto` lo que se suma a `cuotas.monto_pagado`.
 - **Cuota pagada:** cuando `monto_pagado` cubre `monto`. El préstamo pasa a `saldado` sin cuotas pendientes.
+- **Cobro por cliente:** `registrarPagoCliente` (`src/db/pagos.ts`) reparte el monto entre las cuotas pendientes del cliente, de la más vieja a la más nueva, en una transacción. Usa `repartirPago` (`src/utils/reparto.ts`) y la misma lógica que `registrarPago` (`aplicarPago`). Permite adelantar cuotas, con tope en el saldo total.
 - **Saldo:** "Cobrado" y "Falta cobrar" de un préstamo no incluyen mora; el "Total cobrado" del Resumen sí.
 - **Total a devolver:** en el detalle es la suma de las cuotas, porque pueden haberse editado.
 
