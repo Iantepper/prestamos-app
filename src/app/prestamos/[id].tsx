@@ -1,6 +1,6 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { BotonGrande } from '@/components/boton-grande';
@@ -53,20 +53,24 @@ export default function DetallePrestamoScreen() {
   const [cuotaACobrar, setCuotaACobrar] = useState<Cuota | null>(null);
   const [cuotaAEditar, setCuotaAEditar] = useState<Cuota | null>(null);
 
-  useEffect(() => {
-    let activo = true;
-    Promise.all([obtenerPrestamo(db, prestamoId), listarCuotas(db, prestamoId)]).then(
-      ([filaPrestamo, filasCuotas]) => {
-        if (!activo) return;
-        setPrestamo(filaPrestamo);
-        setCuotas(filasCuotas);
-        setCargando(false);
-      }
-    );
-    return () => {
-      activo = false;
-    };
-  }, [db, prestamoId, recarga]);
+  // Se recarga al volver a la pantalla (por ejemplo, después de renovar) y después de cada cambio.
+  useFocusEffect(
+    useCallback(() => {
+      let activo = true;
+      Promise.all([obtenerPrestamo(db, prestamoId), listarCuotas(db, prestamoId)]).then(
+        ([filaPrestamo, filasCuotas]) => {
+          if (!activo) return;
+          setPrestamo(filaPrestamo);
+          setCuotas(filasCuotas);
+          setCargando(false);
+        }
+      );
+      return () => {
+        activo = false;
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [db, prestamoId, recarga])
+  );
 
   if (cargando) return <ThemedView style={styles.container} />;
 
@@ -94,17 +98,22 @@ export default function DetallePrestamoScreen() {
       hoy
     );
 
+  // Las cuotas canceladas (pasaron a un préstamo nuevo al renovar) no cuentan en los saldos.
+  const vigentes = cuotas.filter((q) => q.estado !== 'cancelada');
   // Saldo: lo cobrado y lo que falta de cada cuota (los recargos por mora se cuentan aparte).
   const cobrado = redondear(cuotas.reduce((suma, q) => suma + q.monto_pagado, 0));
   const faltaCobrar = redondear(
-    cuotas.reduce((suma, q) => suma + Math.max(0, q.monto - q.monto_pagado), 0)
+    vigentes.reduce((suma, q) => suma + Math.max(0, q.monto - q.monto_pagado), 0)
   );
   const moraCobrada = redondear(cuotas.reduce((suma, q) => suma + q.mora_pagada, 0));
   // Suma de las cuotas: coincide con monto + interés, salvo que se haya editado alguna cuota.
-  const totalADevolver = redondear(cuotas.reduce((suma, q) => suma + q.monto, 0));
+  const totalADevolver = redondear(vigentes.reduce((suma, q) => suma + q.monto, 0));
 
-  // Solo se puede borrar un préstamo si todavía no se le cobró nada.
+  // Solo se puede borrar un préstamo activo que todavía no cobró nada y no participó de una
+  // renovación.
   const tienePagos = cuotas.some((q) => q.monto_pagado > 0 || q.mora_pagada > 0);
+  const sePuedeEliminar =
+    prestamo.estado === 'activo' && prestamo.renueva_a === null && prestamo.renovado_el === null;
 
   const eliminar = async () => {
     try {
@@ -170,6 +179,11 @@ export default function DetallePrestamoScreen() {
           {prestamo.estado === 'saldado' ? (
             <ThemedText style={[styles.destacado, styles.pagada]}>Préstamo saldado</ThemedText>
           ) : null}
+          {prestamo.estado === 'renovado' ? (
+            <ThemedText style={styles.destacado}>
+              Préstamo renovado: lo que debía pasó a un préstamo nuevo
+            </ThemedText>
+          ) : null}
           <ThemedText style={styles.texto}>
             Prestado: <Monto valor={prestamo.monto} />
           </ThemedText>
@@ -209,8 +223,10 @@ export default function DetallePrestamoScreen() {
         </ThemedText>
         {cuotas.map((cuota) => {
           const pagada = cuota.estado === 'pagada';
+          const cancelada = cuota.estado === 'cancelada';
+          const pendiente = cuota.estado === 'pendiente';
           const { diasAtraso } = moraDe(cuota);
-          const vencida = !pagada && diasAtraso > 0;
+          const vencida = pendiente && diasAtraso > 0;
           return (
             <ThemedView
               key={cuota.id}
@@ -229,6 +245,10 @@ export default function DetallePrestamoScreen() {
               ) : null}
               {pagada ? (
                 <ThemedText style={[styles.texto, styles.pagada]}>Pagada</ThemedText>
+              ) : cancelada ? (
+                <ThemedText style={styles.texto} themeColor="textSecondary">
+                  Cancelada: pasó al préstamo nuevo
+                </ThemedText>
               ) : vencida ? (
                 <ThemedText style={[styles.texto, styles.vencida]}>
                   Vencida hace {textoDias(diasAtraso)}
@@ -236,7 +256,7 @@ export default function DetallePrestamoScreen() {
               ) : (
                 <ThemedText style={styles.texto}>Pendiente</ThemedText>
               )}
-              {!pagada ? (
+              {pendiente ? (
                 <View style={styles.botones}>
                   <BotonGrande texto="Cobrar" onPress={() => setCuotaACobrar(cuota)} />
                   <BotonGrande
@@ -250,15 +270,21 @@ export default function DetallePrestamoScreen() {
           );
         })}
 
-        <View style={styles.eliminar}>
-          {tienePagos ? (
-            <ThemedText style={styles.texto} themeColor="textSecondary">
-              Este préstamo tiene pagos registrados, por eso no se puede eliminar.
-            </ThemedText>
-          ) : (
-            <BotonGrande texto="Eliminar préstamo" variante="peligro" onPress={confirmarEliminar} />
-          )}
-        </View>
+        {sePuedeEliminar ? (
+          <View style={styles.eliminar}>
+            {tienePagos ? (
+              <ThemedText style={styles.texto} themeColor="textSecondary">
+                Este préstamo tiene pagos registrados, por eso no se puede eliminar.
+              </ThemedText>
+            ) : (
+              <BotonGrande
+                texto="Eliminar préstamo"
+                variante="peligro"
+                onPress={confirmarEliminar}
+              />
+            )}
+          </View>
+        ) : null}
       </ScrollView>
 
       {cuotaACobrar ? (

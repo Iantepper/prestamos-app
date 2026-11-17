@@ -183,8 +183,8 @@ export default function ClientesScreen() {
     }
     const cuantos =
       prestamos.saldados === 1
-        ? 'su préstamo saldado'
-        : `sus ${prestamos.saldados} préstamos saldados`;
+        ? 'su préstamo anterior'
+        : `sus ${prestamos.saldados} préstamos anteriores`;
     const primera = await confirmar({
       titulo: `¿Eliminar a ${cliente.nombre} y todo su historial?`,
       mensaje: `También se van a borrar ${cuantos}, con todas sus cuotas y pagos. Lo cobrado deja de aparecer en el Resumen.`,

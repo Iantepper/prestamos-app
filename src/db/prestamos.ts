@@ -73,31 +73,34 @@ export type PrestamoListado = {
   cant_cuotas: number;
   cuotas_pagadas: number;
   cobrado: number; // suma de lo pagado de cada cuota (sin recargos por mora)
-  falta_cobrar: number; // suma de lo que falta de cada cuota
+  falta_cobrar: number; // suma de lo que falta de cada cuota pendiente
   proximo_vencimiento: string | null; // 'YYYY-MM-DD'; null si no quedan cuotas pendientes
+  estado: 'activo' | 'saldado' | 'renovado';
 };
 
-// Préstamos activos o saldados con el avance de sus cuotas.
-// Primero los que vencen antes; los saldados, del más nuevo al más viejo.
+// Préstamos activos o cerrados con el avance de sus cuotas. "saldado" trae también los renovados
+// (cerrados por una renovación), para que sigan a la vista. Primero los que vencen antes; los
+// cerrados, del más nuevo al más viejo.
 export async function listarPrestamos(
   db: SQLiteDatabase,
   estado: 'activo' | 'saldado'
 ): Promise<PrestamoListado[]> {
   return db.getAllAsync<PrestamoListado>(
-    `SELECT p.id, c.nombre AS cliente_nombre, p.monto, p.cant_cuotas,
+    `SELECT p.id, c.nombre AS cliente_nombre, p.monto, p.cant_cuotas, p.estado,
             (SELECT COUNT(*) FROM cuotas q
               WHERE q.prestamo_id = p.id AND q.estado = 'pagada') AS cuotas_pagadas,
             (SELECT COALESCE(SUM(q.monto_pagado), 0) FROM cuotas q
               WHERE q.prestamo_id = p.id) AS cobrado,
             (SELECT COALESCE(SUM(MAX(q.monto - q.monto_pagado, 0)), 0) FROM cuotas q
-              WHERE q.prestamo_id = p.id) AS falta_cobrar,
+              WHERE q.prestamo_id = p.id AND q.estado = 'pendiente') AS falta_cobrar,
             (SELECT MIN(q.fecha_vencimiento) FROM cuotas q
               WHERE q.prestamo_id = p.id AND q.estado = 'pendiente') AS proximo_vencimiento
        FROM prestamos p
        JOIN clientes c ON c.id = p.cliente_id
-      WHERE p.estado = ?
+      WHERE (? = 'activo' AND p.estado = 'activo')
+         OR (? = 'saldado' AND p.estado IN ('saldado', 'renovado'))
       ORDER BY proximo_vencimiento, p.id DESC`,
-    [estado]
+    [estado, estado]
   );
 }
 
@@ -110,7 +113,10 @@ export type PrestamoDetalle = {
   frecuencia: Frecuencia;
   fecha_inicio: string; // 'YYYY-MM-DD'
   mora_diaria_pct: number;
-  estado: 'activo' | 'saldado';
+  estado: 'activo' | 'saldado' | 'renovado';
+  renueva_a: number | null; // préstamo anterior, si este salió de una renovación con descuento
+  renovado_el: string | null; // 'YYYY-MM-DD' de la última renovación que lo involucra
+  renovado_por: number | null; // préstamo nuevo que lo reemplazó, si este quedó 'renovado'
 };
 
 export type Cuota = {
@@ -120,7 +126,7 @@ export type Cuota = {
   monto: number;
   monto_pagado: number;
   mora_pagada: number; // recargos por mora ya cobrados de esta cuota
-  estado: 'pendiente' | 'pagada';
+  estado: 'pendiente' | 'pagada' | 'cancelada'; // cancelada: pasó a un préstamo nuevo al renovar
 };
 
 // Datos de un préstamo con el nombre de su cliente, o null si no existe.
@@ -130,7 +136,10 @@ export async function obtenerPrestamo(
 ): Promise<PrestamoDetalle | null> {
   return db.getFirstAsync<PrestamoDetalle>(
     `SELECT p.id, c.nombre AS cliente_nombre, p.monto, p.tasa_interes, p.cant_cuotas,
-            p.frecuencia, p.fecha_inicio, p.mora_diaria_pct, p.estado
+            p.frecuencia, p.fecha_inicio, p.mora_diaria_pct, p.estado, p.renueva_a,
+            (SELECT MAX(r.fecha) FROM renovaciones r JOIN prestamos n ON n.id = r.prestamo_id
+              WHERE r.prestamo_id = p.id OR n.renueva_a = p.id) AS renovado_el,
+            (SELECT MAX(n.id) FROM prestamos n WHERE n.renueva_a = p.id) AS renovado_por
        FROM prestamos p
        JOIN clientes c ON c.id = p.cliente_id
       WHERE p.id = ?`,
@@ -161,8 +170,8 @@ export async function actualizarCuota(
   );
 }
 
-// Borra un préstamo y sus cuotas, solo si no tiene pagos registrados.
-// Devuelve false (y no borra nada) si tiene pagos.
+// Borra un préstamo y sus cuotas, solo si está activo, no tiene pagos registrados y no participó
+// de una renovación. Devuelve false (y no borra nada) si no se puede.
 export async function eliminarPrestamoSinPagos(
   db: SQLiteDatabase,
   prestamoId: number
@@ -174,6 +183,12 @@ export async function eliminarPrestamoSinPagos(
       [prestamoId]
     );
     if ((fila?.n ?? 0) > 0) return;
+    const renovacion = await db.getFirstAsync<{ n: number }>(
+      `SELECT (SELECT COUNT(*) FROM prestamos WHERE id = ? AND (estado <> 'activo' OR renueva_a IS NOT NULL))
+            + (SELECT COUNT(*) FROM renovaciones WHERE prestamo_id = ?) AS n`,
+      [prestamoId, prestamoId]
+    );
+    if ((renovacion?.n ?? 0) > 0) return;
     await db.runAsync('DELETE FROM cuotas WHERE prestamo_id = ?', [prestamoId]);
     await db.runAsync('DELETE FROM prestamos WHERE id = ?', [prestamoId]);
     eliminado = true;

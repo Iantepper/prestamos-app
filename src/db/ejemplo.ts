@@ -102,11 +102,13 @@ export async function cargarDatosDeEjemplo(db: SQLiteDatabase): Promise<void> {
 export async function borrarTodosLosDatos(db: SQLiteDatabase): Promise<void> {
   await db.withTransactionAsync(async () => {
     await db.execAsync(`
+      DELETE FROM renovaciones;
       DELETE FROM pagos;
       DELETE FROM cuotas;
       DELETE FROM prestamos;
       DELETE FROM clientes;
-      DELETE FROM sqlite_sequence WHERE name IN ('pagos', 'cuotas', 'prestamos', 'clientes');
+      DELETE FROM sqlite_sequence
+       WHERE name IN ('renovaciones', 'pagos', 'cuotas', 'prestamos', 'clientes');
     `);
   });
 }

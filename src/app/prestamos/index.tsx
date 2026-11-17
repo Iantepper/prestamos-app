@@ -378,6 +378,11 @@ export default function PrestamosScreen() {
                 style={({ pressed }) => pressed && styles.presionado}>
                 <ThemedView type="backgroundElement" style={styles.tarjeta}>
                   <ThemedText style={styles.nombre}>{prestamo.cliente_nombre}</ThemedText>
+                  {prestamo.estado === 'renovado' ? (
+                    <ThemedText style={styles.texto} themeColor="textSecondary">
+                      Renovado: lo que debía pasó a un préstamo nuevo
+                    </ThemedText>
+                  ) : null}
                   <ThemedText style={styles.texto}>
                     Prestado: <Monto valor={prestamo.monto} />
                   </ThemedText>

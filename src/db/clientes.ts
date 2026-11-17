@@ -88,7 +88,7 @@ export async function contarPrestamosDeCliente(
 ): Promise<{ activos: number; saldados: number }> {
   const fila = await db.getFirstAsync<{ activos: number; saldados: number }>(
     `SELECT COALESCE(SUM(estado = 'activo'), 0) AS activos,
-            COALESCE(SUM(estado = 'saldado'), 0) AS saldados
+            COALESCE(SUM(estado IN ('saldado', 'renovado')), 0) AS saldados
        FROM prestamos
       WHERE cliente_id = ?`,
     [clienteId]
@@ -111,6 +111,10 @@ export async function eliminarCliente(db: SQLiteDatabase, clienteId: number): Pr
     );
     await db.runAsync(
       'DELETE FROM cuotas WHERE prestamo_id IN (SELECT id FROM prestamos WHERE cliente_id = ?)',
+      [clienteId]
+    );
+    await db.runAsync(
+      'DELETE FROM renovaciones WHERE prestamo_id IN (SELECT id FROM prestamos WHERE cliente_id = ?)',
       [clienteId]
     );
     await db.runAsync('DELETE FROM prestamos WHERE cliente_id = ?', [clienteId]);

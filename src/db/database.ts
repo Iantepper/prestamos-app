@@ -1,9 +1,8 @@
 // src/db/database.ts
 // Modelo de datos local (SQLite) para la app de préstamos.
 // Se ejecuta una vez al abrir la app (ver SQLiteProvider en src/app/_layout.tsx).
+// Cada versión se aplica una sola vez, en orden, y deja anotado su número en PRAGMA user_version.
 import type { SQLiteDatabase } from 'expo-sqlite';
-
-const VERSION_ACTUAL = 1;
 
 export async function migrarDB(db: SQLiteDatabase) {
   // Las claves foráneas hay que activarlas en cada conexión.
@@ -11,52 +10,74 @@ export async function migrarDB(db: SQLiteDatabase) {
 
   const fila = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const version = fila?.user_version ?? 0;
-  if (version >= VERSION_ACTUAL) return;
 
-  await db.execAsync(`
-    PRAGMA journal_mode = WAL;
+  if (version < 1) {
+    await db.execAsync(`
+      PRAGMA journal_mode = WAL;
 
-    CREATE TABLE IF NOT EXISTS clientes (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      nombre     TEXT NOT NULL,
-      telefono   TEXT,
-      direccion  TEXT NOT NULL,   -- se usa para abrir Maps
-      notas      TEXT
-    );
+      CREATE TABLE IF NOT EXISTS clientes (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre     TEXT NOT NULL,
+        telefono   TEXT,
+        direccion  TEXT NOT NULL,   -- se usa para abrir Maps
+        notas      TEXT
+      );
 
-    CREATE TABLE IF NOT EXISTS prestamos (
-      id              INTEGER PRIMARY KEY AUTOINCREMENT,
-      cliente_id      INTEGER NOT NULL REFERENCES clientes(id),
-      monto           REAL NOT NULL,           -- capital prestado
-      tasa_interes    REAL NOT NULL,           -- a definir en Fase 1 (total o por período)
-      cant_cuotas     INTEGER NOT NULL,
-      frecuencia      TEXT NOT NULL,           -- 'semanal' | 'quincenal' | 'mensual'
-      fecha_inicio    TEXT NOT NULL,           -- 'YYYY-MM-DD'
-      mora_diaria_pct REAL NOT NULL DEFAULT 0, -- % de recargo por día de atraso
-      estado          TEXT NOT NULL DEFAULT 'activo'  -- 'activo' | 'saldado'
-    );
+      CREATE TABLE IF NOT EXISTS prestamos (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        cliente_id      INTEGER NOT NULL REFERENCES clientes(id),
+        monto           REAL NOT NULL,           -- capital prestado
+        tasa_interes    REAL NOT NULL,           -- interés total en %, sobre el monto
+        cant_cuotas     INTEGER NOT NULL,
+        frecuencia      TEXT NOT NULL,           -- 'semanal' | 'quincenal' | 'mensual'
+        fecha_inicio    TEXT NOT NULL,           -- 'YYYY-MM-DD'
+        mora_diaria_pct REAL NOT NULL DEFAULT 0, -- % de recargo por día de atraso
+        estado          TEXT NOT NULL DEFAULT 'activo'  -- 'activo' | 'saldado' | 'renovado' (v2)
+      );
 
-    CREATE TABLE IF NOT EXISTS cuotas (
-      id                INTEGER PRIMARY KEY AUTOINCREMENT,
-      prestamo_id       INTEGER NOT NULL REFERENCES prestamos(id) ON DELETE CASCADE,
-      numero            INTEGER NOT NULL,
-      fecha_vencimiento TEXT NOT NULL,         -- editable: ingresos irregulares
-      monto             REAL NOT NULL,         -- editable por el prestamista
-      monto_pagado      REAL NOT NULL DEFAULT 0,
-      estado            TEXT NOT NULL DEFAULT 'pendiente'  -- 'pendiente' | 'pagada'
-    );
+      CREATE TABLE IF NOT EXISTS cuotas (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        prestamo_id       INTEGER NOT NULL REFERENCES prestamos(id) ON DELETE CASCADE,
+        numero            INTEGER NOT NULL,
+        fecha_vencimiento TEXT NOT NULL,         -- editable: ingresos irregulares
+        monto             REAL NOT NULL,         -- editable por el prestamista
+        monto_pagado      REAL NOT NULL DEFAULT 0,
+        estado            TEXT NOT NULL DEFAULT 'pendiente'  -- 'pendiente' | 'pagada' | 'cancelada' (v2)
+      );
 
-    CREATE TABLE IF NOT EXISTS pagos (
-      id        INTEGER PRIMARY KEY AUTOINCREMENT,
-      cuota_id  INTEGER NOT NULL REFERENCES cuotas(id) ON DELETE CASCADE,
-      fecha     TEXT NOT NULL,
-      monto     REAL NOT NULL,
-      mora      REAL NOT NULL DEFAULT 0
-    );
+      CREATE TABLE IF NOT EXISTS pagos (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        cuota_id  INTEGER NOT NULL REFERENCES cuotas(id) ON DELETE CASCADE,
+        fecha     TEXT NOT NULL,
+        monto     REAL NOT NULL,
+        mora      REAL NOT NULL DEFAULT 0
+      );
 
-    CREATE INDEX IF NOT EXISTS idx_cuotas_venc ON cuotas(fecha_vencimiento, estado);
-    CREATE INDEX IF NOT EXISTS idx_prestamos_cliente ON prestamos(cliente_id);
+      CREATE INDEX IF NOT EXISTS idx_cuotas_venc ON cuotas(fecha_vencimiento, estado);
+      CREATE INDEX IF NOT EXISTS idx_prestamos_cliente ON prestamos(cliente_id);
 
-    PRAGMA user_version = ${VERSION_ACTUAL};
-  `);
+      PRAGMA user_version = 1;
+    `);
+  }
+
+  // Versión 2: renovación de préstamos.
+  // Los estados son texto sin CHECK, así que 'renovado' (préstamos) y 'cancelada' (cuotas) no
+  // necesitan cambiar las tablas: solo se agregan la columna renueva_a y la tabla renovaciones.
+  if (version < 2) {
+    await db.execAsync(`
+      ALTER TABLE prestamos ADD COLUMN renueva_a INTEGER REFERENCES prestamos(id);  -- préstamo anterior
+
+      CREATE TABLE IF NOT EXISTS renovaciones (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        prestamo_id    INTEGER NOT NULL REFERENCES prestamos(id),  -- el préstamo que queda vigente
+        fecha          TEXT NOT NULL,                              -- 'YYYY-MM-DD'
+        modo           TEXT NOT NULL,                              -- 'descuento' | 'sumar'
+        deuda_anterior REAL NOT NULL,
+        monto_nuevo    REAL NOT NULL,
+        entregado      REAL NOT NULL
+      );
+
+      PRAGMA user_version = 2;
+    `);
+  }
 }

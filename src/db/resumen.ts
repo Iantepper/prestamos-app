@@ -19,7 +19,7 @@ export async function obtenerResumen(db: SQLiteDatabase): Promise<Resumen> {
        (SELECT COALESCE(SUM(mora), 0) FROM pagos) AS mora_cobrada,
        (SELECT COALESCE(SUM(MAX(q.monto - q.monto_pagado, 0)), 0)
           FROM cuotas q JOIN prestamos p ON p.id = q.prestamo_id
-         WHERE p.estado = 'activo') AS falta_cobrar,
+         WHERE p.estado = 'activo' AND q.estado = 'pendiente') AS falta_cobrar,
        (SELECT COUNT(*) FROM prestamos WHERE estado = 'activo') AS prestamos_activos,
        (SELECT COUNT(*) FROM prestamos WHERE estado = 'saldado') AS prestamos_saldados`
   );
