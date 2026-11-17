@@ -251,6 +251,7 @@ export async function listarPrestamos(
 
 export type PrestamoDetalle = {
   id: number;
+  cliente_id: number;
   cliente_nombre: string;
   monto: number;
   tasa_interes: number;
@@ -280,7 +281,7 @@ export async function obtenerPrestamo(
   prestamoId: number
 ): Promise<PrestamoDetalle | null> {
   return db.getFirstAsync<PrestamoDetalle>(
-    `SELECT p.id, c.nombre AS cliente_nombre, p.monto, p.tasa_interes, p.cant_cuotas,
+    `SELECT p.id, p.cliente_id, c.nombre AS cliente_nombre, p.monto, p.tasa_interes, p.cant_cuotas,
             p.frecuencia, p.fecha_inicio, p.mora_diaria_pct, p.estado, p.renueva_a,
             (SELECT MAX(r.fecha) FROM renovaciones r JOIN prestamos n ON n.id = r.prestamo_id
               WHERE r.prestamo_id = p.id OR n.renueva_a = p.id) AS renovado_el,

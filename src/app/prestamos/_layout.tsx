@@ -7,6 +7,7 @@ export default function PrestamosLayout() {
     <Stack screenOptions={OpcionesEncabezado}>
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="[id]" options={{ title: 'Detalle del préstamo' }} />
+      <Stack.Screen name="renovar" options={{ title: 'Renovar préstamo' }} />
     </Stack>
   );
 }

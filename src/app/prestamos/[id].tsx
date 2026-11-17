@@ -27,7 +27,7 @@ import {
   type Cuota,
   type PrestamoDetalle,
 } from '@/db/prestamos';
-import { formatearFecha, hoyISO } from '@/utils/formato';
+import { formatearDiaMes, formatearFecha, hoyISO } from '@/utils/formato';
 import { calcularMoraPendiente } from '@/utils/mora';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
 
@@ -112,6 +112,8 @@ export default function DetallePrestamoScreen() {
   // Solo se puede borrar un préstamo activo que todavía no cobró nada y no participó de una
   // renovación.
   const tienePagos = cuotas.some((q) => q.monto_pagado > 0 || q.mora_pagada > 0);
+  const sePuedeRenovar =
+    prestamo.estado === 'activo' && cuotas.some((q) => q.estado === 'pendiente');
   const sePuedeEliminar =
     prestamo.estado === 'activo' && prestamo.renueva_a === null && prestamo.renovado_el === null;
 
@@ -184,6 +186,11 @@ export default function DetallePrestamoScreen() {
               Préstamo renovado: lo que debía pasó a un préstamo nuevo
             </ThemedText>
           ) : null}
+          {prestamo.renovado_el ? (
+            <ThemedText style={styles.destacado}>
+              Renovado el {formatearDiaMes(prestamo.renovado_el)}
+            </ThemedText>
+          ) : null}
           <ThemedText style={styles.texto}>
             Prestado: <Monto valor={prestamo.monto} />
           </ThemedText>
@@ -217,6 +224,30 @@ export default function DetallePrestamoScreen() {
             Falta cobrar: <Monto valor={faltaCobrar} />
           </ThemedText>
         </ThemedView>
+
+        {sePuedeRenovar ? (
+          <BotonGrande
+            texto="Renovar préstamo"
+            variante="secundario"
+            onPress={() =>
+              router.push({
+                pathname: '/prestamos/renovar',
+                params: { id: prestamo.id, desde: 'detalle' },
+              })
+            }
+          />
+        ) : null}
+        {prestamo.estado === 'renovado' && prestamo.renovado_por !== null ? (
+          <BotonGrande
+            texto="Ver el préstamo nuevo"
+            onPress={() =>
+              router.replace({
+                pathname: '/prestamos/[id]',
+                params: { id: prestamo.renovado_por! },
+              })
+            }
+          />
+        ) : null}
 
         <ThemedText type="subtitle" style={styles.tituloLista}>
           Cuotas
