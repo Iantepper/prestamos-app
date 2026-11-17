@@ -14,14 +14,18 @@ export async function hayDatos(db: SQLiteDatabase): Promise<boolean> {
   return (fila?.n ?? 0) > 0;
 }
 
-// Crea 4 clientes, uno de cada perfil de riesgo, con préstamos en distintos estados:
+// Crea 5 clientes con préstamos en distintos estados (uno de cada perfil de riesgo, más uno para
+// probar las renovaciones):
 //   Rosa (Cumplidor): un préstamo saldado y otro con dos cuotas pagas y una que vence hoy.
 //   Jorge (Con atrasos): una cuota pagada tarde y otra vencida hace 3 días.
 //   Carlos (Riesgo): dos cuotas vencidas sin cobrar.
 //   Ana (Nuevo): un préstamo que empieza hoy, sin cuotas vencidas.
+//   Laura (Cumplidor): $ 100.000 al 20 % en 4 cuotas de $ 30.000, con 2 pagas y 2 pendientes; sirve
+//   para probar las dos renovaciones (por ejemplo, un crédito nuevo de $ 110.000 o de $ 50.000).
 // Cada cliente tiene un solo préstamo activo (el de Rosa que está saldado se paga antes de crear
-// el nuevo, porque crearPrestamo no permite dos activos). Las fechas se calculan a partir de hoy, así la demo funciona cualquier día. Sin recargo por mora
-// (mora_diaria_pct = 0), como los préstamos nuevos.
+// el nuevo, porque crearPrestamo no permite dos activos). Las fechas se calculan a partir de hoy,
+// así la demo funciona cualquier día. Sin recargo por mora (mora_diaria_pct = 0), como los
+// préstamos nuevos.
 export async function cargarDatosDeEjemplo(db: SQLiteDatabase): Promise<void> {
   const hoy = hoyISO();
   const dia = (n: number) => sumarDias(hoy, n);
@@ -96,6 +100,22 @@ export async function cargarDatosDeEjemplo(db: SQLiteDatabase): Promise<void> {
     frecuencia: 'semanal',
     fechaInicio: hoy,
   });
+
+  const laura = await crearCliente(db, {
+    nombre: 'Laura Pérez',
+    telefono: '11 5678 9012',
+    direccion: 'Av. Santa Fe 3300, CABA',
+    notas: 'Suele pedir más plata antes de terminar',
+  });
+  const deLaura = await crearPrestamo(db, laura, {
+    monto: 100000,
+    tasaPct: 20,
+    cantCuotas: 4,
+    frecuencia: 'semanal',
+    fechaInicio: dia(-15), // cuotas: hace 8 días, ayer, en 6 días y en 13 días
+  });
+  await pagarCuota(deLaura, 1, dia(-8));
+  await pagarCuota(deLaura, 2, dia(-1));
 }
 
 // Borra todos los clientes, préstamos, cuotas y pagos.

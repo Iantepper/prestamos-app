@@ -44,7 +44,7 @@ export default function AjustesScreen() {
           }
         : {
             titulo: '¿Cargar datos de ejemplo?',
-            mensaje: 'Se van a crear 4 clientes con préstamos para probar la app.',
+            mensaje: 'Se van a crear 5 clientes con préstamos para probar la app.',
             confirmar: 'Sí, cargar',
           }
     );
@@ -88,8 +88,8 @@ export default function AjustesScreen() {
           <ThemedView type="backgroundElement" style={styles.tarjeta}>
             <ThemedText style={styles.titulo}>Datos de ejemplo</ThemedText>
             <ThemedText>
-              Crea 4 clientes con préstamos en distintos estados (al día, con atrasos, con riesgo y
-              nuevo) para mostrar cómo funciona la app.
+              Crea 5 clientes con préstamos en distintos estados (al día, con atrasos, con riesgo,
+              nuevo y uno para probar la renovación) para mostrar cómo funciona la app.
             </ThemedText>
             <BotonGrande texto="Cargar datos de ejemplo" onPress={confirmarEjemplo} />
           </ThemedView>
