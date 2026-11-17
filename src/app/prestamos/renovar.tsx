@@ -426,8 +426,7 @@ export default function RenovarScreen() {
               {perfil === 'riesgo' ? (
                 <ThemedView style={styles.avisoRiesgo}>
                   <ThemedText style={styles.textoAvisoRiesgo}>
-                    Atención: este cliente tiene 2 o más cuotas vencidas sin cobrar. Pensalo bien
-                    antes de prestarle más.
+                    Este cliente tiene 2 o más cuotas vencidas sin cobrar
                   </ThemedText>
                 </ThemedView>
               ) : null}

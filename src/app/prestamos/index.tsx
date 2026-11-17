@@ -14,14 +14,7 @@ import { EncabezadoPantalla } from '@/components/encabezado-pantalla';
 import { GuiaPasos } from '@/components/guia-pasos';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import {
-  BottomTabInset,
-  Colors,
-  bordeDestacado,
-  EstiloTarjeta,
-  MaxContentWidth,
-  Spacing,
-} from '@/constants/theme';
+import { BottomTabInset, Colors, EstiloTarjeta, MaxContentWidth, Spacing } from '@/constants/theme';
 import { listarClientes, type Cliente } from '@/db/clientes';
 import {
   ClienteConPrestamoActivoError,
@@ -262,14 +255,6 @@ export default function PrestamosScreen() {
                     Escribí el nombre para encontrar a otros
                   </ThemedText>
                 ) : null}
-                {clienteId !== null && perfiles.get(clienteId) === 'riesgo' ? (
-                  <ThemedView style={styles.avisoRiesgo}>
-                    <ThemedText style={styles.textoAvisoRiesgo}>
-                      Atención: este cliente tiene cuotas muy atrasadas o muchos pagos fuera de
-                      término. Pensalo bien antes de prestarle.
-                    </ThemedText>
-                  </ThemedView>
-                ) : null}
                 {errores.cliente ? (
                   <ThemedText style={styles.error}>{errores.cliente}</ThemedText>
                 ) : null}
@@ -460,13 +445,6 @@ const styles = StyleSheet.create({
   },
   yaTienePrestamo: {
     color: Colors.textSecondary,
-    fontSize: 20,
-    lineHeight: 28,
-    fontWeight: '700',
-  },
-  avisoRiesgo: { ...EstiloTarjeta, ...bordeDestacado(COLOR_ERROR) },
-  textoAvisoRiesgo: {
-    color: COLOR_ERROR,
     fontSize: 20,
     lineHeight: 28,
     fontWeight: '700',

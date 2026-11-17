@@ -97,11 +97,11 @@ src/
 - **Saldo:** "Cobrado" y "Falta cobrar" de cada préstamo no incluyen los recargos por mora. El "Total cobrado" del Resumen sí los incluye, y lo aclara.
 
 ### Perfil de riesgo del cliente (`src/utils/riesgo.ts`)
-Pago tardío = un pago registrado después del vencimiento de su cuota. Se evalúa en este orden:
-1. **Riesgo** (rojo): 3 o más pagos tardíos en los últimos 90 días, o una cuota vencida hace 15 días o más.
-2. **Con atrasos** (amarillo): 1 o 2 pagos tardíos en los últimos 90 días, o una cuota vencida hace menos de 15 días.
-3. **Nuevo** (gris): todavía no tiene pagos registrados.
-4. **Cumplidor** (verde): tiene pagos, ninguno tardío en los últimos 90 días, y nada vencido.
+Se basa en los intentos de cobro fallidos: al prestamista le preocupa el segundo cobro que no se pudo hacer. Una cuota está vencida si su fecha ya pasó y no está pagada completa (un pago parcial no la salda). Se evalúa en este orden, con todos los préstamos del cliente:
+1. **Riesgo** (rojo): 2 o más cuotas vencidas sin cobrar.
+2. **Con atrasos** (amarillo): 1 cuota vencida sin cobrar, o alguna cuota pagada después de su vencimiento en los últimos 90 días.
+3. **Nuevo** (gris): sin pagos y sin cuotas vencidas.
+4. **Cumplidor** (verde): el resto.
 
 El indicador siempre muestra el texto además del color.
 
