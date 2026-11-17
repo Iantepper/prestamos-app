@@ -45,8 +45,33 @@ export async function existeClienteIgual(
   const nombre = normalizarTexto(cliente.nombre);
   const direccion = normalizarTexto(cliente.direccion);
   return filas.some(
-    (fila) => normalizarTexto(fila.nombre) === nombre && normalizarTexto(fila.direccion) === direccion
+    (fila) =>
+      normalizarTexto(fila.nombre) === nombre && normalizarTexto(fila.direccion) === direccion
   );
+}
+
+export type DeudaCliente = {
+  debe: number; // lo que falta de todas sus cuotas pendientes (sin mora)
+  vencido: number; // la parte de eso que ya venció (cuotas con fecha anterior a hoy)
+};
+
+// Deuda de cada cliente con préstamo activo, por id. Los clientes sin préstamo activo no aparecen.
+export async function obtenerDeudasClientes(
+  db: SQLiteDatabase,
+  hoy: string // 'YYYY-MM-DD'
+): Promise<Map<number, DeudaCliente>> {
+  const filas = await db.getAllAsync<{ cliente_id: number; debe: number; vencido: number }>(
+    `SELECT p.cliente_id,
+            COALESCE(SUM(MAX(q.monto - q.monto_pagado, 0)), 0) AS debe,
+            COALESCE(SUM(CASE WHEN q.fecha_vencimiento < ? THEN MAX(q.monto - q.monto_pagado, 0)
+                              ELSE 0 END), 0) AS vencido
+       FROM prestamos p
+       JOIN cuotas q ON q.prestamo_id = p.id AND q.estado = 'pendiente'
+      WHERE p.estado = 'activo'
+      GROUP BY p.cliente_id`,
+    [hoy]
+  );
+  return new Map(filas.map((f) => [f.cliente_id, { debe: f.debe, vencido: f.vencido }]));
 }
 
 // Devuelve todos los clientes ordenados por nombre.

@@ -9,11 +9,12 @@ import { CampoTexto } from '@/components/campo-texto';
 import { CuadroEditarCliente } from '@/components/cuadro-editar-cliente';
 import { useAviso, useConfirmar } from '@/components/dialogos';
 import { IndicadorRiesgo } from '@/components/indicador-riesgo';
+import { Monto } from '@/components/monto';
 import { EncabezadoPantalla } from '@/components/encabezado-pantalla';
 import { GuiaPasos } from '@/components/guia-pasos';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, EstiloTarjeta, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, Colors, EstiloTarjeta, MaxContentWidth, Spacing } from '@/constants/theme';
 import {
   actualizarCliente,
   contarPrestamosDeCliente,
@@ -21,8 +22,10 @@ import {
   eliminarCliente,
   existeClienteIgual,
   listarClientes,
+  obtenerDeudasClientes,
   type Cliente,
   type ClienteNuevo,
+  type DeudaCliente,
 } from '@/db/clientes';
 import { obtenerPerfilesRiesgo } from '@/db/riesgo';
 import { filtrarPorNombre } from '@/utils/busqueda';
@@ -46,6 +49,7 @@ export default function ClientesScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const nombreRef = useRef<TextInput>(null);
   const [perfiles, setPerfiles] = useState<Map<number, NivelRiesgo>>(new Map());
+  const [deudas, setDeudas] = useState<Map<number, DeudaCliente>>(new Map());
   const [recarga, setRecarga] = useState(0);
   const [clienteAEditar, setClienteAEditar] = useState<Cliente | null>(null);
   const [busqueda, setBusqueda] = useState('');
@@ -55,13 +59,17 @@ export default function ClientesScreen() {
   useFocusEffect(
     useCallback(() => {
       let activo = true;
-      Promise.all([listarClientes(db), obtenerPerfilesRiesgo(db, hoyISO())]).then(
-        ([filas, perfilesClientes]) => {
-          if (!activo) return;
-          setClientes(filas);
-          setPerfiles(perfilesClientes);
-        }
-      );
+      const hoy = hoyISO();
+      Promise.all([
+        listarClientes(db),
+        obtenerPerfilesRiesgo(db, hoy),
+        obtenerDeudasClientes(db, hoy),
+      ]).then(([filas, perfilesClientes, deudasClientes]) => {
+        if (!activo) return;
+        setClientes(filas);
+        setPerfiles(perfilesClientes);
+        setDeudas(deudasClientes);
+      });
       return () => {
         activo = false;
       };
@@ -278,6 +286,16 @@ export default function ClientesScreen() {
                 <ThemedView key={cliente.id} type="backgroundElement" style={styles.tarjeta}>
                   <ThemedText style={styles.nombre}>{cliente.nombre}</ThemedText>
                   <IndicadorRiesgo nivel={perfiles.get(cliente.id) ?? 'nuevo'} />
+                  {deudas.has(cliente.id) ? (
+                    <ThemedText style={styles.dato}>
+                      Debe en total: <Monto valor={deudas.get(cliente.id)!.debe} enteros />
+                    </ThemedText>
+                  ) : null}
+                  {(deudas.get(cliente.id)?.vencido ?? 0) > 0 ? (
+                    <ThemedText style={[styles.dato, styles.vencido]}>
+                      Vencido: <Monto valor={deudas.get(cliente.id)!.vencido} enteros />
+                    </ThemedText>
+                  ) : null}
                   {cliente.telefono ? (
                     <ThemedText style={styles.dato}>{cliente.telefono}</ThemedText>
                   ) : null}
@@ -362,6 +380,10 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two,
   },
   tarjeta: EstiloTarjeta,
+  vencido: {
+    color: Colors.danger,
+    fontWeight: '700',
+  },
   nombre: {
     fontSize: 24,
     lineHeight: 32,
