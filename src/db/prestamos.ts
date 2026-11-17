@@ -3,6 +3,13 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { calcularCuotas, type DatosPrestamo, type Frecuencia } from '@/utils/cuotas';
+import {
+  calcularDescuento,
+  calcularSuma,
+  ErrorRenovacion,
+  type CuotaActual,
+  type NuevoCredito,
+} from '@/utils/renovacion';
 
 // Error de crearPrestamo cuando el cliente ya tiene un préstamo activo.
 export class ClienteConPrestamoActivoError extends Error {
@@ -29,41 +36,179 @@ export async function crearPrestamo(
   datos: DatosPrestamo,
   moraDiariaPct = 0
 ): Promise<number> {
-  const cuotas = calcularCuotas(datos);
   let prestamoId = 0;
-
   await db.withTransactionAsync(async () => {
     const activos = await db.getFirstAsync<{ n: number }>(
       "SELECT COUNT(*) AS n FROM prestamos WHERE cliente_id = ? AND estado = 'activo'",
       [clienteId]
     );
     if ((activos?.n ?? 0) > 0) throw new ClienteConPrestamoActivoError();
+    prestamoId = await insertarPrestamo(db, clienteId, datos, moraDiariaPct, null);
+  });
+  return prestamoId;
+}
 
-    const resultado = await db.runAsync(
-      `INSERT INTO prestamos
-         (cliente_id, monto, tasa_interes, cant_cuotas, frecuencia, fecha_inicio, mora_diaria_pct)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
-        clienteId,
-        datos.monto,
-        datos.tasaPct,
-        datos.cantCuotas,
-        datos.frecuencia,
-        datos.fechaInicio,
-        moraDiariaPct,
-      ]
+// Inserta el préstamo y sus cuotas, sin abrir una transacción propia (para usar dentro de otra).
+async function insertarPrestamo(
+  db: SQLiteDatabase,
+  clienteId: number,
+  datos: DatosPrestamo,
+  moraDiariaPct: number,
+  renuevaA: number | null
+): Promise<number> {
+  const resultado = await db.runAsync(
+    `INSERT INTO prestamos
+       (cliente_id, monto, tasa_interes, cant_cuotas, frecuencia, fecha_inicio, mora_diaria_pct,
+        renueva_a)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      clienteId,
+      datos.monto,
+      datos.tasaPct,
+      datos.cantCuotas,
+      datos.frecuencia,
+      datos.fechaInicio,
+      moraDiariaPct,
+      renuevaA,
+    ]
+  );
+  const prestamoId = resultado.lastInsertRowId;
+  for (const cuota of calcularCuotas(datos)) {
+    await db.runAsync(
+      'INSERT INTO cuotas (prestamo_id, numero, fecha_vencimiento, monto) VALUES (?, ?, ?, ?)',
+      [prestamoId, cuota.numero, cuota.fechaVencimiento, cuota.monto]
     );
-    prestamoId = resultado.lastInsertRowId;
+  }
+  return prestamoId;
+}
 
-    for (const cuota of cuotas) {
+export type OpcionesRenovacion =
+  | (NuevoCredito & { modo: 'descuento'; frecuencia: Frecuencia; fechaInicio: string })
+  | (NuevoCredito & { modo: 'sumar' });
+
+// Cuotas de un préstamo en la forma que usan los cálculos de renovación.
+export async function cuotasParaRenovar(
+  db: SQLiteDatabase,
+  prestamoId: number
+): Promise<CuotaActual[]> {
+  const filas = await db.getAllAsync<{
+    id: number;
+    numero: number;
+    fecha_vencimiento: string;
+    monto: number;
+    monto_pagado: number;
+    estado: CuotaActual['estado'];
+  }>(
+    'SELECT id, numero, fecha_vencimiento, monto, monto_pagado, estado FROM cuotas WHERE prestamo_id = ?',
+    [prestamoId]
+  );
+  return filas.map((q) => ({
+    id: q.id,
+    numero: q.numero,
+    fechaVencimiento: q.fecha_vencimiento,
+    monto: q.monto,
+    montoPagado: q.monto_pagado,
+    estado: q.estado,
+  }));
+}
+
+// Renueva un préstamo activo, todo en una transacción (las reglas están en src/utils/renovacion.ts).
+//   descuento: el préstamo pasa a 'renovado', sus cuotas pendientes a 'cancelada', y se crea uno
+//              nuevo de X (con renueva_a y sus cuotas, sin mora).
+//   sumar:     se agrandan las cuotas pendientes, se agregan las que sobran y se actualizan
+//              cant_cuotas y monto (capital total).
+// En los dos casos se anota la renovación en la tabla renovaciones, con el préstamo que queda
+// vigente. Devuelve el id de ese préstamo. Si los datos no sirven, lanza ErrorRenovacion.
+export async function renovarPrestamo(
+  db: SQLiteDatabase,
+  prestamoId: number,
+  opciones: OpcionesRenovacion,
+  fecha: string // 'YYYY-MM-DD'
+): Promise<number> {
+  let vigente = prestamoId;
+  await db.withTransactionAsync(async () => {
+    const prestamo = await db.getFirstAsync<{
+      cliente_id: number;
+      estado: string;
+      frecuencia: Frecuencia;
+    }>('SELECT cliente_id, estado, frecuencia FROM prestamos WHERE id = ?', [prestamoId]);
+    if (!prestamo || prestamo.estado !== 'activo') {
+      throw new ErrorRenovacion('Solo se puede renovar un préstamo activo');
+    }
+    const cuotas = await cuotasParaRenovar(db, prestamoId);
+
+    if (opciones.modo === 'descuento') {
+      const r = calcularDescuento(cuotas, opciones);
+      await db.runAsync("UPDATE prestamos SET estado = 'renovado' WHERE id = ?", [prestamoId]);
       await db.runAsync(
-        'INSERT INTO cuotas (prestamo_id, numero, fecha_vencimiento, monto) VALUES (?, ?, ?, ?)',
-        [prestamoId, cuota.numero, cuota.fechaVencimiento, cuota.monto]
+        "UPDATE cuotas SET estado = 'cancelada' WHERE prestamo_id = ? AND estado = 'pendiente'",
+        [prestamoId]
+      );
+      vigente = await insertarPrestamo(
+        db,
+        prestamo.cliente_id,
+        {
+          monto: opciones.montoNuevo,
+          tasaPct: opciones.tasaPct,
+          cantCuotas: opciones.cantCuotas,
+          frecuencia: opciones.frecuencia,
+          fechaInicio: opciones.fechaInicio,
+        },
+        0,
+        prestamoId
+      );
+      await anotarRenovacion(
+        db,
+        vigente,
+        fecha,
+        'descuento',
+        r.deuda,
+        opciones.montoNuevo,
+        r.entregado
+      );
+    } else {
+      const r = calcularSuma(cuotas, prestamo.frecuencia, opciones);
+      for (const q of r.modificadas) {
+        await db.runAsync('UPDATE cuotas SET monto = ? WHERE id = ?', [q.monto, q.id]);
+      }
+      for (const q of r.agregadas) {
+        await db.runAsync(
+          'INSERT INTO cuotas (prestamo_id, numero, fecha_vencimiento, monto) VALUES (?, ?, ?, ?)',
+          [prestamoId, q.numero, q.fechaVencimiento, q.monto]
+        );
+      }
+      await db.runAsync(
+        'UPDATE prestamos SET cant_cuotas = cant_cuotas + ?, monto = ROUND(monto + ?, 2) WHERE id = ?',
+        [r.agregadas.length, opciones.montoNuevo, prestamoId]
+      );
+      await anotarRenovacion(
+        db,
+        prestamoId,
+        fecha,
+        'sumar',
+        r.deuda,
+        opciones.montoNuevo,
+        r.entregado
       );
     }
   });
+  return vigente;
+}
 
-  return prestamoId;
+async function anotarRenovacion(
+  db: SQLiteDatabase,
+  prestamoId: number,
+  fecha: string,
+  modo: 'descuento' | 'sumar',
+  deudaAnterior: number,
+  montoNuevo: number,
+  entregado: number
+) {
+  await db.runAsync(
+    `INSERT INTO renovaciones (prestamo_id, fecha, modo, deuda_anterior, monto_nuevo, entregado)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [prestamoId, fecha, modo, deudaAnterior, montoNuevo, entregado]
+  );
 }
 
 export type PrestamoListado = {
