@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BotonGrande } from '@/components/boton-grande';
 import { CampoTexto } from '@/components/campo-texto';
-import { useAviso } from '@/components/dialogos';
+import { useAviso, useConfirmar } from '@/components/dialogos';
 import { IndicadorRiesgo } from '@/components/indicador-riesgo';
 import { Monto } from '@/components/monto';
 import { OpcionGrande } from '@/components/opcion-grande';
@@ -63,6 +63,7 @@ type Errores = {
 export default function PrestamosScreen() {
   const db = useSQLiteContext();
   const avisar = useAviso();
+  const confirmar = useConfirmar();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const scrollRef = useRef<ScrollView>(null);
   const [clienteId, setClienteId] = useState<number | null>(null);
@@ -77,7 +78,8 @@ export default function PrestamosScreen() {
   const [prestamos, setPrestamos] = useState<PrestamoListado[]>([]);
   const [perfiles, setPerfiles] = useState<Map<number, NivelRiesgo>>(new Map());
   // Clientes que ya tienen un préstamo activo: no se les puede dar otro.
-  const [conPrestamo, setConPrestamo] = useState<Set<number>>(new Set());
+  // Cliente -> su préstamo activo. A esos clientes no se les puede dar otro: se renueva el que tienen.
+  const [conPrestamo, setConPrestamo] = useState<Map<number, number>>(new Map());
   const [verSaldados, setVerSaldados] = useState(false);
   const [recarga, setRecarga] = useState(0);
 
@@ -150,6 +152,21 @@ export default function PrestamosScreen() {
     if (!fechaISO) nuevos.fecha = 'Escribí la fecha como día/mes/año. Ej: 05/11/2026';
     setErrores(nuevos);
     return Object.keys(nuevos).length === 0;
+  };
+
+  // Al tocar un cliente que ya tiene préstamo, se ofrece renovarlo.
+  const ofrecerRenovar = async (prestamoActivo: number) => {
+    const renovar = await confirmar({
+      titulo: 'Este cliente ya tiene un préstamo activo',
+      mensaje: 'Podés renovarlo desde el detalle de su préstamo.',
+      confirmar: 'Renovar',
+    });
+    if (renovar) {
+      router.push({
+        pathname: '/prestamos/renovar',
+        params: { id: prestamoActivo, desde: 'alta' },
+      });
+    }
   };
 
   const guardar = async () => {
@@ -231,10 +248,7 @@ export default function PrestamosScreen() {
                     seleccionada={cliente.id === clienteId}
                     onPress={() =>
                       conPrestamo.has(cliente.id)
-                        ? avisar(
-                            'Este cliente ya tiene un préstamo activo',
-                            'Podés renovarlo desde el detalle de su préstamo.'
-                          )
+                        ? ofrecerRenovar(conPrestamo.get(cliente.id)!)
                         : setClienteId(cliente.id)
                     }>
                     <IndicadorRiesgo nivel={perfiles.get(cliente.id) ?? 'nuevo'} />

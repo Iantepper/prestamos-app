@@ -19,12 +19,13 @@ export class ClienteConPrestamoActivoError extends Error {
   }
 }
 
-// Ids de los clientes que tienen un préstamo activo (cada cliente puede tener uno solo).
-export async function clientesConPrestamoActivo(db: SQLiteDatabase): Promise<Set<number>> {
-  const filas = await db.getAllAsync<{ cliente_id: number }>(
-    "SELECT DISTINCT cliente_id FROM prestamos WHERE estado = 'activo'"
+// Préstamo activo de cada cliente que tiene uno: id del cliente -> id del préstamo (cada cliente
+// puede tener uno solo; los renovados no cuentan).
+export async function clientesConPrestamoActivo(db: SQLiteDatabase): Promise<Map<number, number>> {
+  const filas = await db.getAllAsync<{ cliente_id: number; prestamo_id: number }>(
+    "SELECT cliente_id, MAX(id) AS prestamo_id FROM prestamos WHERE estado = 'activo' GROUP BY cliente_id"
   );
-  return new Set(filas.map((f) => f.cliente_id));
+  return new Map(filas.map((f) => [f.cliente_id, f.prestamo_id]));
 }
 
 // Guarda el préstamo y todas sus cuotas en una sola transacción. Devuelve el id del préstamo.
