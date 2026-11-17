@@ -18,9 +18,18 @@ Expo SDK 57, React Native, TypeScript, Expo Router (rutas en `src/app/`), `expo-
 
 ## Modelo de datos (src/db/database.ts, ya creado)
 Tablas: `clientes` (nombre, telefono, direccion obligatoria, notas), `prestamos` (cliente_id, monto, tasa_interes, cant_cuotas, frecuencia semanal|quincenal|mensual, fecha_inicio, mora_diaria_pct, estado), `cuotas` (prestamo_id, numero, fecha_vencimiento, monto, monto_pagado, estado pendiente|pagada; fecha y monto editables), `pagos` (cuota_id, fecha, monto, mora). Fechas como texto `YYYY-MM-DD`.
+Versión 2 de la base (renovaciones, `PRAGMA user_version = 2`): préstamos con estado `renovado`, cuotas con estado `cancelada`, columna `prestamos.renueva_a` (préstamo anterior, puede ser nulo) y tabla `renovaciones` (prestamo_id = el préstamo que queda vigente, fecha, modo `descuento` | `sumar`, deuda_anterior, monto_nuevo, entregado). Los estados son texto sin `CHECK`, así que no hizo falta reconstruir tablas. `migrarDB` aplica cada versión una sola vez y en orden. Las cuotas canceladas no cuentan en ningún cálculo (agenda, totales, riesgo, "Debe en total", saldos); un préstamo renovado no cuenta como activo.
 
 ## Decisión de negocio: cálculo de cuotas (src/utils/cuotas.ts, ya creado)
 Interés simple sobre el total: total = monto + monto × tasa%; cuota = total / cantidad de cuotas, todas iguales (la última absorbe el redondeo). La primera cuota vence un período después de la fecha de inicio (semanal 7 días, quincenal 14, mensual 1 mes).
+
+## Decisión de negocio: renovación de préstamos (src/utils/renovacion.ts)
+Un cliente tiene un solo préstamo activo. Cuando pide más plata se **renueva** su préstamo, y el prestamista elige entre dos modos con el mismo "Monto del nuevo crédito" (X). La **deuda** es la suma de (monto − monto_pagado) de las cuotas pendientes, sin mora.
+- **Descontar lo que debe** (`descuento`): se hace un crédito nuevo de monto X, con interés sobre X completo (incluye lo que debía). Se le entrega X menos la deuda; X tiene que ser mayor que la deuda. El préstamo actual pasa a `renovado`, sus cuotas pendientes a `cancelada`, y se crea uno nuevo (con `renueva_a`, frecuencia y fecha de inicio elegidas, mora 0).
+  - Ejemplo: deuda $60.000, X $110.000, 20 %, 4 cuotas: se entregan $50.000 y quedan 4 cuotas de $33.000 (total $132.000).
+- **Sumar a las cuotas que quedan** (`sumar`): se entrega X completo. Con X, el interés y la cantidad de cuotas se calculan cuotas nuevas (`calcularCuotas`), y la cuota nueva i se **suma** a la i-ésima cuota pendiente, de la más vieja a la más nueva. Si las nuevas son más que las pendientes, las que sobran se agregan al final, con la frecuencia del préstamo, a partir de su última cuota. Si son menos, solo se agrandan las primeras. Se actualizan `cant_cuotas` y `monto` (capital total); `tasa_interes` queda la original.
+  - Ejemplo: 2 pendientes de $30.000, X $50.000, 20 %, 4 cuotas: quedan $45.000, $45.000, $15.000 y $15.000, y se entregan $50.000.
+- **Guardado:** `renovarPrestamo` (`src/db/prestamos.ts`) hace todo en una transacción y anota una fila en `renovaciones`. Si los datos no sirven, lanza `ErrorRenovacion` con el mensaje para mostrar. Después de renovar se reprograman los avisos de las 9:00.
 
 ## Decisión de negocio: sin recargo por mora
 El prestamista entrevistado no cobra mora. El alta de préstamo ya no tiene el campo "Recargo por mora" y los préstamos nuevos guardan `mora_diaria_pct = 0` (también los datos de ejemplo). La lógica de mora (`src/utils/mora.ts`, la columna `mora_diaria_pct`, `pagos.mora`) queda dormida: los préstamos viejos con mora siguen calculándola y mostrándola. Con mora 0 no aparece ninguna línea de mora ni de recargo en la Agenda, los cobros, el detalle ni el Resumen.
@@ -67,11 +76,16 @@ Pantallas (`src/app/`):
   - "Editar" y "Eliminar" van en la misma fila; "Eliminar" usa la variante `peligroBorde`, para no ser el botón dominante.
   - "Eliminar" (`eliminarCliente`, en una transacción). Con préstamos activos no se puede (avisa "Cobralos o eliminá esos préstamos primero"). Solo con saldados: doble confirmación, y se borran también sus préstamos, cuotas y pagos (cambian los totales del Resumen). Sin préstamos: confirmación simple.
 - **Préstamos** (`prestamos/`, Stack):
-  - `index.tsx`: alta, eligiendo el cliente con `OpcionGrande` + perfil, con aviso si es Riesgo. Lista con botones "Activos" / "Saldados".
-    - **Un préstamo activo por cliente:** `crearPrestamo` lanza `ClienteConPrestamoActivoError` si el cliente ya tiene uno. En el alta, esos clientes muestran "Ya tiene un préstamo" y al tocarlos aparece el aviso "Este cliente ya tiene un préstamo activo. Podés renovarlo desde el detalle de su préstamo." Los datos existentes no se tocaron.
+  - `index.tsx`: alta, eligiendo el cliente con `OpcionGrande` + perfil. Lista con botones "Activos" / "Saldados" (la vista "Saldados" incluye también los préstamos renovados, con la etiqueta "Renovado").
+    - **Un préstamo activo por cliente:** `crearPrestamo` lanza `ClienteConPrestamoActivoError` si el cliente ya tiene uno. En el alta, esos clientes muestran "Ya tiene un préstamo" y al tocarlos aparece el aviso "Este cliente ya tiene un préstamo activo. Podés renovarlo desde el detalle de su préstamo." Los datos existentes no se tocaron. El aviso tiene un botón "Renovar" que abre la pantalla de renovación (`clientesConPrestamoActivo` devuelve cliente -> préstamo activo).
     - No hay campo de mora (ver "Decisión de negocio: sin recargo por mora").
     - Elección del cliente: campo "Buscar por nombre". Con más de 5 clientes se muestran solo los 5 primeros que coinciden (`MAX_CLIENTES_VISIBLES`), con el texto "Escribí el nombre para encontrar a otros". El cliente elegido se sigue mostrando aunque cambie la búsqueda.
-  - `[id].tsx`: detalle con saldo y cuotas. Cada cuota pendiente tiene "Cobrar" y "Editar" (`CuadroEditarCuota`). "Eliminar préstamo" aparece solo sin pagos (`eliminarPrestamoSinPagos`).
+  - `renovar.tsx` (`/prestamos/renovar?id=…&desde=detalle|alta`): renovación en 3 pasos.
+    1. "Lo que debe hoy: $X en N cuotas" y los datos del nuevo crédito; frecuencia y fecha de inicio solo para descontar.
+    2. Dos tarjetas para comparar los modos.
+    3. "Revisá antes de confirmar": préstamo actual, qué se hace, cómo quedan todas las cuotas, "Le entregás hoy", "Antes pagaba $… por cuota, ahora $…", nueva fecha final y el perfil de riesgo, con el aviso destacado "Este cliente tiene 2 o más cuotas vencidas sin cobrar" si está en Riesgo.
+    Confirma con el cuadro grande. Después vuelve al préstamo vigente (el mismo si se sumó, el nuevo si se descontó) y avisa que se renovó.
+  - `[id].tsx`: detalle con saldo y cuotas. Si está activo y tiene cuotas pendientes, botón "Renovar préstamo". Muestra "Renovado el DD/MM" cuando hubo una renovación; un préstamo `renovado` muestra sus cuotas canceladas y un botón para ver el préstamo nuevo. Cada cuota pendiente tiene "Cobrar" y "Editar" (`CuadroEditarCuota`). "Eliminar préstamo" aparece solo en préstamos activos sin pagos que no participaron de una renovación (`eliminarPrestamoSinPagos`).
   - Consultas en `src/db/prestamos.ts`.
 - **Resumen** (`resumen/`, Stack):
   - `index.tsx`: totales (consulta en `src/db/resumen.ts`).
