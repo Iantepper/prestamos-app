@@ -1,5 +1,6 @@
 // src/db/riesgo.ts
-// Perfil de riesgo de todos los clientes, calculado con sus pagos y cuotas vencidas.
+// Perfil de riesgo de todos los clientes, calculado con sus pagos y sus cuotas vencidas sin cobrar
+// completas (de todos sus préstamos). La regla está en src/utils/riesgo.ts.
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { calcularPerfilRiesgo, type HistorialCliente, type NivelRiesgo } from '@/utils/riesgo';
@@ -11,8 +12,13 @@ export async function obtenerPerfilesRiesgo(
 ): Promise<Map<number, NivelRiesgo>> {
   const [clientes, pagos, vencidas] = await Promise.all([
     db.getAllAsync<{ id: number }>('SELECT id FROM clientes'),
-    db.getAllAsync<{ cliente_id: number; fecha: string; fecha_vencimiento: string }>(
-      `SELECT p.cliente_id, g.fecha, q.fecha_vencimiento
+    db.getAllAsync<{
+      cliente_id: number;
+      cuota_id: number;
+      fecha: string;
+      fecha_vencimiento: string;
+    }>(
+      `SELECT p.cliente_id, g.cuota_id, g.fecha, q.fecha_vencimiento
          FROM pagos g
          JOIN cuotas q ON q.id = g.cuota_id
          JOIN prestamos p ON p.id = q.prestamo_id`
@@ -29,9 +35,11 @@ export async function obtenerPerfilesRiesgo(
   const historiales = new Map<number, HistorialCliente>();
   for (const { id } of clientes) historiales.set(id, { pagos: [], vencimientosPendientes: [] });
   for (const pago of pagos) {
-    historiales
-      .get(pago.cliente_id)
-      ?.pagos.push({ fecha: pago.fecha, fechaVencimiento: pago.fecha_vencimiento });
+    historiales.get(pago.cliente_id)?.pagos.push({
+      cuotaId: pago.cuota_id,
+      fecha: pago.fecha,
+      fechaVencimiento: pago.fecha_vencimiento,
+    });
   }
   for (const cuota of vencidas) {
     historiales.get(cuota.cliente_id)?.vencimientosPendientes.push(cuota.fecha_vencimiento);

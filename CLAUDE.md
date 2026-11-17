@@ -26,12 +26,12 @@ Interés simple sobre el total: total = monto + monto × tasa%; cuota = total / 
 El prestamista entrevistado no cobra mora. El alta de préstamo ya no tiene el campo "Recargo por mora" y los préstamos nuevos guardan `mora_diaria_pct = 0` (también los datos de ejemplo). La lógica de mora (`src/utils/mora.ts`, la columna `mora_diaria_pct`, `pagos.mora`) queda dormida: los préstamos viejos con mora siguen calculándola y mostrándola. Con mora 0 no aparece ninguna línea de mora ni de recargo en la Agenda, los cobros, el detalle ni el Resumen.
 
 ## Decisión de negocio: perfil de riesgo del cliente (src/utils/riesgo.ts)
-Se calcula con todos los préstamos del cliente (`obtenerPerfilesRiesgo` en `src/db/riesgo.ts`). Pago tardío = un pago con fecha posterior al vencimiento de su cuota (se cuenta cada pago, también los parciales). Se evalúa en este orden:
-1. **Riesgo** (rojo): 3 o más pagos tardíos en los últimos 90 días, o alguna cuota vencida hace 15 días o más.
-2. **Con atrasos** (amarillo): 1 o 2 pagos tardíos en los últimos 90 días, o alguna cuota vencida hace menos de 15 días.
-3. **Nuevo** (gris): sin pagos registrados (y sin cuotas vencidas).
-4. **Cumplidor** (verde): el resto, es decir, tiene pagos, ninguno tardío en los últimos 90 días, y nada vencido.
-El indicador siempre muestra el texto además del color.
+Motivo: el prestamista se preocupa por el segundo intento de cobro fallido. Se calcula con todos los préstamos del cliente (`obtenerPerfilesRiesgo` en `src/db/riesgo.ts`). Una cuota está **vencida** si su fecha es anterior a hoy y no está completamente pagada (un pago parcial no la salda). Se evalúa en este orden:
+1. **Riesgo** (rojo): 2 o más cuotas vencidas sin cobrar completas.
+2. **Con atrasos** (amarillo): exactamente 1 cuota vencida sin cobrar, o alguna cuota pagada después de su vencimiento en los últimos 90 días (se cuenta por cuota y no por pago: una cuota pagada tarde en dos partes cuenta una vez).
+3. **Nuevo** (gris): sin pagos y sin cuotas vencidas.
+4. **Cumplidor** (verde): el resto.
+El indicador siempre muestra el texto además del color. Ya no se usan los umbrales viejos (3 pagos tardíos, 15 días de atraso).
 
 ## Plan por fases
 - Fase 0: entorno, proyecto Expo, SQLite. **Completa.**

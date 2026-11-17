@@ -1,32 +1,37 @@
 // src/utils/riesgo.ts
-// Perfil de riesgo de un cliente según sus atrasos:
-//   Riesgo (rojo):       3 o más pagos tardíos en los últimos 90 días, o una cuota vencida hace 15 días o más.
-//   Con atrasos (amarillo): 1 o 2 pagos tardíos en los últimos 90 días, o una cuota vencida hace menos de 15 días.
-//   Nuevo (gris):        sin pagos registrados y sin cuotas vencidas.
-//   Cumplidor (verde):   tiene pagos, ninguno tardío en los últimos 90 días, y ninguna cuota vencida.
-// Pago tardío: la fecha del pago es posterior al vencimiento de su cuota.
+// Perfil de riesgo de un cliente según los intentos de cobro fallidos (el prestamista se preocupa
+// por el segundo intento de cobro fallido). Se evalúa en este orden, con todos sus préstamos:
+//   Riesgo (rojo):          2 o más cuotas vencidas sin cobrar completas.
+//   Con atrasos (amarillo): exactamente 1 cuota vencida sin cobrar, o alguna cuota pagada después
+//                           de su vencimiento en los últimos 90 días (se cuenta por cuota).
+//   Nuevo (gris):           sin pagos y sin cuotas vencidas.
+//   Cumplidor (verde):      el resto.
+// Cuota vencida: su fecha es anterior a hoy y no está completamente pagada (un pago parcial no
+// la salda).
 import { ColoresRiesgo } from '@/constants/theme';
 import { diasEntre } from '@/utils/mora';
 
 export type NivelRiesgo = 'cumplidor' | 'con_atrasos' | 'riesgo' | 'nuevo';
 
 export type HistorialCliente = {
-  pagos: { fecha: string; fechaVencimiento: string }[]; // fechas 'YYYY-MM-DD'
-  vencimientosPendientes: string[]; // vencimientos de sus cuotas sin pagar
+  pagos: { cuotaId: number; fecha: string; fechaVencimiento: string }[]; // fechas 'YYYY-MM-DD'
+  vencimientosPendientes: string[]; // vencimientos de sus cuotas que no están completamente pagadas
 };
 
+// Ventana para mirar las cuotas pagadas tarde.
 const DIAS_VENTANA = 90;
-const DIAS_ATRASO_GRAVE = 15;
-const PAGOS_TARDIOS_RIESGO = 3;
 
 export function calcularPerfilRiesgo(historial: HistorialCliente, hoy: string): NivelRiesgo {
-  const pagosTardios = historial.pagos.filter(
-    (pago) => diasEntre(pago.fecha, hoy) <= DIAS_VENTANA && pago.fecha > pago.fechaVencimiento
-  ).length;
-  const maxDiasAtraso = Math.max(0, ...historial.vencimientosPendientes.map((f) => diasEntre(f, hoy)));
+  const vencidas = historial.vencimientosPendientes.filter((fecha) => fecha < hoy).length;
+  // Cuotas (no pagos) que recibieron algún pago después de vencer, en los últimos 90 días.
+  const cuotasPagadasTarde = new Set(
+    historial.pagos
+      .filter((p) => p.fecha > p.fechaVencimiento && diasEntre(p.fecha, hoy) <= DIAS_VENTANA)
+      .map((p) => p.cuotaId)
+  ).size;
 
-  if (pagosTardios >= PAGOS_TARDIOS_RIESGO || maxDiasAtraso >= DIAS_ATRASO_GRAVE) return 'riesgo';
-  if (pagosTardios > 0 || maxDiasAtraso > 0) return 'con_atrasos';
+  if (vencidas >= 2) return 'riesgo';
+  if (vencidas === 1 || cuotasPagadasTarde > 0) return 'con_atrasos';
   if (historial.pagos.length === 0) return 'nuevo';
   return 'cumplidor';
 }
@@ -42,6 +47,14 @@ export const PERFILES: Record<NivelRiesgo, { texto: string; color: string; color
     color: ColoresRiesgo.con_atrasos.fondo,
     colorTexto: ColoresRiesgo.con_atrasos.texto,
   },
-  riesgo: { texto: 'Riesgo', color: ColoresRiesgo.riesgo.fondo, colorTexto: ColoresRiesgo.riesgo.texto },
-  nuevo: { texto: 'Nuevo', color: ColoresRiesgo.nuevo.fondo, colorTexto: ColoresRiesgo.nuevo.texto },
+  riesgo: {
+    texto: 'Riesgo',
+    color: ColoresRiesgo.riesgo.fondo,
+    colorTexto: ColoresRiesgo.riesgo.texto,
+  },
+  nuevo: {
+    texto: 'Nuevo',
+    color: ColoresRiesgo.nuevo.fondo,
+    colorTexto: ColoresRiesgo.nuevo.texto,
+  },
 };

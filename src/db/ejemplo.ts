@@ -17,7 +17,7 @@ export async function hayDatos(db: SQLiteDatabase): Promise<boolean> {
 // Crea 4 clientes, uno de cada perfil de riesgo, con préstamos en distintos estados:
 //   Rosa (Cumplidor): un préstamo saldado y otro con dos cuotas pagas y una que vence hoy.
 //   Jorge (Con atrasos): una cuota pagada tarde y otra vencida hace 3 días.
-//   Carlos (Riesgo): una cuota vencida hace unos 20 días.
+//   Carlos (Riesgo): dos cuotas vencidas sin cobrar.
 //   Ana (Nuevo): un préstamo que empieza hoy, sin cuotas vencidas.
 // Cada cliente tiene un solo préstamo activo (el de Rosa que está saldado se paga antes de crear
 // el nuevo, porque crearPrestamo no permite dos activos). Las fechas se calculan a partir de hoy, así la demo funciona cualquier día. Sin recargo por mora
@@ -81,8 +81,8 @@ export async function cargarDatosDeEjemplo(db: SQLiteDatabase): Promise<void> {
     monto: 50000,
     tasaPct: 30,
     cantCuotas: 3,
-    frecuencia: 'mensual',
-    fechaInicio: dia(-50),
+    frecuencia: 'quincenal',
+    fechaInicio: dia(-40), // vencieron hace 26 y 12 días; la tercera vence en 2 días
   });
 
   const ana = await crearCliente(db, {
