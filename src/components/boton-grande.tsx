@@ -17,10 +17,19 @@ type Props = {
   style?: StyleProp<ViewStyle>;
   // Ícono a la izquierda del texto: SF Symbol en iOS y Material Symbol en Android y web.
   icono?: SymbolViewProps['name'];
+  // Más alto (64 px) y con letra de 22 px: para los cuadros de confirmación.
+  textoGrande?: boolean;
 };
 
 // Botón grande y de alto contraste para las acciones principales.
-export function BotonGrande({ texto, onPress, variante = 'principal', style, icono }: Props) {
+export function BotonGrande({
+  texto,
+  onPress,
+  variante = 'principal',
+  style,
+  icono,
+  textoGrande,
+}: Props) {
   const colorTexto =
     variante === 'secundario'
       ? COLOR_PRINCIPAL
@@ -36,12 +45,15 @@ export function BotonGrande({ texto, onPress, variante = 'principal', style, ico
         variante === 'secundario' && styles.secundario,
         variante === 'peligro' && styles.peligro,
         variante === 'peligroBorde' && styles.peligroBorde,
+        textoGrande && styles.botonGrande,
         pressed && styles.presionado,
         style,
       ]}>
       <View style={styles.contenido}>
         {icono ? <SymbolView name={icono} size={26} tintColor={colorTexto} /> : null}
-        <Text style={[styles.texto, { color: colorTexto }]}>{texto}</Text>
+        <Text style={[styles.texto, textoGrande && styles.textoGrande, { color: colorTexto }]}>
+          {texto}
+        </Text>
       </View>
     </Pressable>
   );
@@ -69,6 +81,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.backgroundElement,
     borderColor: COLOR_PELIGRO,
   },
+  botonGrande: {
+    minHeight: 64,
+  },
   presionado: {
     opacity: 0.8,
   },
@@ -83,5 +98,8 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  textoGrande: {
+    fontSize: 22,
   },
 });

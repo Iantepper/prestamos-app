@@ -1,11 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { BotonGrande } from '@/components/boton-grande';
 import { CuadroCobro, textoDias } from '@/components/cuadro-cobro';
 import { CuadroEditarCuota } from '@/components/cuadro-editar-cuota';
+import { useAviso, useConfirmar } from '@/components/dialogos';
 import { Monto } from '@/components/monto';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -41,6 +42,8 @@ const TEXTO_FRECUENCIA = {
 
 export default function DetallePrestamoScreen() {
   const db = useSQLiteContext();
+  const confirmar = useConfirmar();
+  const avisar = useAviso();
   const { id } = useLocalSearchParams<{ id: string }>();
   const prestamoId = Number(id);
   const [prestamo, setPrestamo] = useState<PrestamoDetalle | null>(null);
@@ -107,27 +110,26 @@ export default function DetallePrestamoScreen() {
     try {
       const eliminado = await eliminarPrestamoSinPagos(db, prestamo.id);
       if (!eliminado) {
-        Alert.alert('No se puede eliminar', 'Este préstamo tiene pagos registrados.');
+        avisar('No se puede eliminar', 'Este préstamo tiene pagos registrados.');
         return;
       }
     } catch {
-      Alert.alert('No se pudo eliminar', 'Probá de nuevo.');
+      avisar('No se pudo eliminar', 'Probá de nuevo.');
       return;
     }
     reprogramarRecordatorios(db);
-    Alert.alert('Préstamo eliminado');
+    avisar('Préstamo eliminado');
     router.back();
   };
 
-  const confirmarEliminar = () => {
-    Alert.alert(
-      '¿Seguro? No se puede deshacer',
-      `Se va a borrar el préstamo de ${prestamo.cliente_nombre} con todas sus cuotas.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Eliminar', style: 'destructive', onPress: eliminar },
-      ]
-    );
+  const confirmarEliminar = async () => {
+    const seguro = await confirmar({
+      titulo: '¿Seguro? No se puede deshacer',
+      mensaje: `Se va a borrar el préstamo de ${prestamo.cliente_nombre} con todas sus cuotas.`,
+      confirmar: 'Sí, eliminar',
+      destructiva: true,
+    });
+    if (seguro) await eliminar();
   };
 
   const guardarCuota = async (
@@ -137,26 +139,26 @@ export default function DetallePrestamoScreen() {
     try {
       await actualizarCuota(db, cuota.id, cambios);
     } catch {
-      Alert.alert('No se pudo guardar', 'Probá de nuevo.');
+      avisar('No se pudo guardar', 'Probá de nuevo.');
       return;
     }
     setCuotaAEditar(null);
     setRecarga((r) => r + 1);
     reprogramarRecordatorios(db);
-    Alert.alert('Cuota actualizada');
+    avisar('Cuota actualizada');
   };
 
   const cobrar = async (cuota: Cuota, pago: { monto: number; mora: number }) => {
     try {
       await registrarPago(db, { cuotaId: cuota.id, fecha: hoy, ...pago });
     } catch {
-      Alert.alert('No se pudo guardar', 'Probá de nuevo.');
+      avisar('No se pudo guardar', 'Probá de nuevo.');
       return;
     }
     setCuotaACobrar(null);
     setRecarga((r) => r + 1);
     reprogramarRecordatorios(db);
-    Alert.alert('Pago registrado');
+    avisar('Pago registrado');
   };
 
   return (

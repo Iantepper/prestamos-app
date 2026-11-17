@@ -1,11 +1,12 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BotonGrande } from '@/components/boton-grande';
 import { CampoTexto } from '@/components/campo-texto';
+import { useAviso } from '@/components/dialogos';
 import { IndicadorRiesgo } from '@/components/indicador-riesgo';
 import { Monto } from '@/components/monto';
 import { OpcionGrande } from '@/components/opcion-grande';
@@ -56,6 +57,7 @@ type Errores = {
 
 export default function PrestamosScreen() {
   const db = useSQLiteContext();
+  const avisar = useAviso();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const scrollRef = useRef<ScrollView>(null);
   const [clienteId, setClienteId] = useState<number | null>(null);
@@ -146,7 +148,7 @@ export default function PrestamosScreen() {
     try {
       await crearPrestamo(db, clienteId, datos, moraNum);
     } catch {
-      Alert.alert('No se pudo guardar', 'Probá de nuevo.');
+      avisar('No se pudo guardar', 'Probá de nuevo.');
       return;
     }
     setClienteId(null);
@@ -160,7 +162,7 @@ export default function PrestamosScreen() {
     setErrores({});
     setRecarga((r) => r + 1);
     reprogramarRecordatorios(db);
-    Alert.alert('Préstamo guardado');
+    avisar('Préstamo guardado');
   };
 
   return (

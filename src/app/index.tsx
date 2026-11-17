@@ -2,11 +2,12 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BotonGrande } from '@/components/boton-grande';
 import { CuadroCobro, textoDias } from '@/components/cuadro-cobro';
+import { avisar } from '@/components/dialogos';
 import { Monto } from '@/components/monto';
 import { EncabezadoPantalla } from '@/components/encabezado-pantalla';
 import { GuiaPasos } from '@/components/guia-pasos';
@@ -116,13 +117,13 @@ export default function AgendaScreen() {
     try {
       await registrarPago(db, { cuotaId: cobro.cuota_id, fecha: hoyISO(), ...pago });
     } catch {
-      Alert.alert('No se pudo guardar', 'Probá de nuevo.');
+      avisar('No se pudo guardar', 'Probá de nuevo.');
       return;
     }
     setCobroACobrar(null);
     setRecarga((r) => r + 1);
     reprogramarRecordatorios(db);
-    Alert.alert('Pago registrado');
+    avisar('Pago registrado');
   };
 
   return (
@@ -255,7 +256,7 @@ async function abrirMapa(direccion: string) {
   try {
     await Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${consulta}`);
   } catch {
-    Alert.alert('No se pudo abrir el mapa');
+    avisar('No se pudo abrir el mapa');
   }
 }
 

@@ -1,12 +1,13 @@
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BotonGrande } from '@/components/boton-grande';
 import { CampoTexto } from '@/components/campo-texto';
 import { CuadroEditarCliente } from '@/components/cuadro-editar-cliente';
+import { useAviso, useConfirmar } from '@/components/dialogos';
 import { IndicadorRiesgo } from '@/components/indicador-riesgo';
 import { EncabezadoPantalla } from '@/components/encabezado-pantalla';
 import { GuiaPasos } from '@/components/guia-pasos';
@@ -34,6 +35,8 @@ type Errores = { nombre?: string; direccion?: string };
 
 export default function ClientesScreen() {
   const db = useSQLiteContext();
+  const confirmar = useConfirmar();
+  const avisar = useAviso();
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [direccion, setDireccion] = useState('');
@@ -82,11 +85,15 @@ export default function ClientesScreen() {
     } catch {
       // Si no se puede revisar, se guarda igual: el aviso es solo una ayuda.
     }
-    if (repetido) {
-      Alert.alert('Ya existe un cliente igual', '¿Cargarlo de todas formas?', [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Cargar igual', onPress: guardarNuevo },
-      ]);
+    if (
+      repetido &&
+      !(await confirmar({
+        titulo: 'Ya existe un cliente igual',
+        mensaje: '¿Cargarlo de todas formas?',
+        confirmar: 'Cargar igual',
+        cancelar: 'Cancelar',
+      }))
+    ) {
       return;
     }
     await guardarNuevo();
@@ -96,7 +103,7 @@ export default function ClientesScreen() {
     try {
       await crearCliente(db, { nombre, telefono, direccion, notas });
     } catch {
-      Alert.alert('No se pudo guardar', 'Probá de nuevo.');
+      avisar('No se pudo guardar', 'Probá de nuevo.');
       return;
     }
     setNombre('');
@@ -105,38 +112,38 @@ export default function ClientesScreen() {
     setNotas('');
     setErrores({});
     setRecarga((r) => r + 1);
-    Alert.alert('Cliente guardado');
+    avisar('Cliente guardado');
   };
 
   const guardarCambios = async (cliente: Cliente, datos: ClienteNuevo) => {
     try {
       await actualizarCliente(db, cliente.id, datos);
     } catch {
-      Alert.alert('No se pudo guardar', 'Probá de nuevo.');
+      avisar('No se pudo guardar', 'Probá de nuevo.');
       return;
     }
     setClienteAEditar(null);
     setRecarga((r) => r + 1);
-    Alert.alert('Cliente actualizado');
+    avisar('Cliente actualizado');
   };
 
   const eliminar = async (cliente: Cliente) => {
     try {
       const eliminado = await eliminarCliente(db, cliente.id);
       if (!eliminado) {
-        Alert.alert(
+        avisar(
           'No se puede eliminar',
           'Este cliente tiene préstamos activos. Cobralos o eliminá esos préstamos primero.'
         );
         return;
       }
     } catch {
-      Alert.alert('No se pudo eliminar', 'Probá de nuevo.');
+      avisar('No se pudo eliminar', 'Probá de nuevo.');
       return;
     }
     setRecarga((r) => r + 1);
     reprogramarRecordatorios(db);
-    Alert.alert('Cliente eliminado');
+    avisar('Cliente eliminado');
   };
 
   // Sin préstamos: confirmación simple. Con préstamos saldados: doble confirmación, porque
@@ -146,47 +153,44 @@ export default function ClientesScreen() {
     try {
       prestamos = await contarPrestamosDeCliente(db, cliente.id);
     } catch {
-      Alert.alert('No se pudo eliminar', 'Probá de nuevo.');
+      avisar('No se pudo eliminar', 'Probá de nuevo.');
       return;
     }
     if (prestamos.activos > 0) {
-      Alert.alert(
+      avisar(
         'No se puede eliminar',
         'Este cliente tiene préstamos activos. Cobralos o eliminá esos préstamos primero.'
       );
       return;
     }
     if (prestamos.saldados === 0) {
-      Alert.alert(`¿Eliminar a ${cliente.nombre}?`, 'No se puede deshacer.', [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Eliminar', style: 'destructive', onPress: () => eliminar(cliente) },
-      ]);
+      const seguro = await confirmar({
+        titulo: `¿Eliminar a ${cliente.nombre}?`,
+        mensaje: 'No se puede deshacer.',
+        confirmar: 'Sí, eliminar',
+        destructiva: true,
+      });
+      if (seguro) await eliminar(cliente);
       return;
     }
     const cuantos =
       prestamos.saldados === 1
         ? 'su préstamo saldado'
         : `sus ${prestamos.saldados} préstamos saldados`;
-    Alert.alert(
-      `¿Eliminar a ${cliente.nombre} y todo su historial?`,
-      `También se van a borrar ${cuantos}, con todas sus cuotas y pagos. Lo cobrado deja de aparecer en el Resumen.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Sí, eliminar',
-          style: 'destructive',
-          onPress: () =>
-            Alert.alert(
-              'Última confirmación',
-              `Se borra ${cliente.nombre} con todo su historial. Esto no se puede deshacer.`,
-              [
-                { text: 'Cancelar', style: 'cancel' },
-                { text: 'Eliminar todo', style: 'destructive', onPress: () => eliminar(cliente) },
-              ]
-            ),
-        },
-      ]
-    );
+    const primera = await confirmar({
+      titulo: `¿Eliminar a ${cliente.nombre} y todo su historial?`,
+      mensaje: `También se van a borrar ${cuantos}, con todas sus cuotas y pagos. Lo cobrado deja de aparecer en el Resumen.`,
+      confirmar: 'Sí, eliminar',
+      destructiva: true,
+    });
+    if (!primera) return;
+    const segunda = await confirmar({
+      titulo: 'Última confirmación',
+      mensaje: `Se borra ${cliente.nombre} con todo su historial. Esto no se puede deshacer.`,
+      confirmar: 'Sí, eliminar todo',
+      destructiva: true,
+    });
+    if (segunda) await eliminar(cliente);
   };
 
   return (

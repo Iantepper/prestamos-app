@@ -1,9 +1,10 @@
 // Ajustes: borrar todos los datos (siempre visible, con doble confirmación) y cargar datos de
 // ejemplo para la demo (solo en modo desarrollo).
 import { useSQLiteContext } from 'expo-sqlite';
-import { Alert, ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 
 import { BotonGrande } from '@/components/boton-grande';
+import { useAviso, useConfirmar } from '@/components/dialogos';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, EstiloTarjeta, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -12,16 +13,18 @@ import { reprogramarRecordatorios } from '@/utils/recordatorios';
 
 export default function AjustesScreen() {
   const db = useSQLiteContext();
+  const confirmar = useConfirmar();
+  const avisar = useAviso();
 
   const cargarEjemplo = async () => {
     try {
       await cargarDatosDeEjemplo(db);
     } catch {
-      Alert.alert('No se pudieron cargar los datos de ejemplo', 'Probá de nuevo.');
+      avisar('No se pudieron cargar los datos de ejemplo', 'Probá de nuevo.');
       return;
     }
     reprogramarRecordatorios(db);
-    Alert.alert('Datos de ejemplo cargados', 'Mirá la Agenda para ver los cobros.');
+    avisar('Datos de ejemplo cargados', 'Mirá la Agenda para ver los cobros.');
   };
 
   const confirmarEjemplo = async () => {
@@ -31,60 +34,50 @@ export default function AjustesScreen() {
     } catch {
       // Si no se puede saber, se pregunta como si no hubiera datos.
     }
-    if (yaHayDatos) {
-      Alert.alert(
-        'Ya tenés datos cargados',
-        'Los datos de ejemplo se van a sumar a los clientes y préstamos que ya tenés. ¿Querés cargarlos igual?',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Cargar igual', onPress: cargarEjemplo },
-        ]
-      );
-    } else {
-      Alert.alert(
-        '¿Cargar datos de ejemplo?',
-        'Se van a crear 4 clientes con préstamos para probar la app.',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Cargar', onPress: cargarEjemplo },
-        ]
-      );
-    }
+    const cargar = await confirmar(
+      yaHayDatos
+        ? {
+            titulo: 'Ya tenés datos cargados',
+            mensaje:
+              'Los datos de ejemplo se van a sumar a los clientes y préstamos que ya tenés. ¿Querés cargarlos igual?',
+            confirmar: 'Sí, cargar igual',
+          }
+        : {
+            titulo: '¿Cargar datos de ejemplo?',
+            mensaje: 'Se van a crear 4 clientes con préstamos para probar la app.',
+            confirmar: 'Sí, cargar',
+          }
+    );
+    if (cargar) await cargarEjemplo();
   };
 
   const borrarTodo = async () => {
     try {
       await borrarTodosLosDatos(db);
     } catch {
-      Alert.alert('No se pudieron borrar los datos', 'Probá de nuevo.');
+      avisar('No se pudieron borrar los datos', 'Probá de nuevo.');
       return;
     }
     reprogramarRecordatorios(db);
-    Alert.alert('Se borraron todos los datos');
+    avisar('Se borraron todos los datos');
   };
 
   // Doble confirmación: borrar todo no se puede deshacer.
-  const confirmarBorrado = () => {
-    Alert.alert(
-      '¿Borrar todos los datos?',
-      'Esto borra todos tus clientes y préstamos. No se puede deshacer',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Sí, borrar',
-          style: 'destructive',
-          onPress: () =>
-            Alert.alert(
-              'Última confirmación',
-              'Esto no se puede deshacer. ¿Seguro que querés borrar todo?',
-              [
-                { text: 'Cancelar', style: 'cancel' },
-                { text: 'Borrar todo', style: 'destructive', onPress: borrarTodo },
-              ]
-            ),
-        },
-      ]
-    );
+  const confirmarBorrado = async () => {
+    const primera = await confirmar({
+      titulo: '¿Borrar todos los datos?',
+      mensaje: 'Esto borra todos tus clientes y préstamos. No se puede deshacer',
+      confirmar: 'Sí, borrar',
+      destructiva: true,
+    });
+    if (!primera) return;
+    const segunda = await confirmar({
+      titulo: 'Última confirmación',
+      mensaje: 'Esto no se puede deshacer. ¿Seguro que querés borrar todo?',
+      confirmar: 'Sí, borrar todo',
+      destructiva: true,
+    });
+    if (segunda) await borrarTodo();
   };
 
   return (

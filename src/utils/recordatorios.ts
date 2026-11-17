@@ -5,8 +5,9 @@
 // quedan desactivados sin afectar al resto de la app.
 import type * as ModuloNotificaciones from 'expo-notifications';
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
 
+import { avisar } from '@/components/dialogos';
 import { resumirCobrosPorDia } from '@/db/agenda';
 import { armarAvisos } from '@/utils/avisos-cobro';
 import { hoyISO, sumarDias } from '@/utils/formato';
@@ -107,14 +108,10 @@ async function reprogramarAhora(db: SQLiteDatabase): Promise<void> {
 
 // Explica para qué se piden las notificaciones antes de que aparezca el pedido del celular.
 function explicarPermiso(): Promise<void> {
-  return new Promise((resolve) => {
-    Alert.alert(
-      'Avisos de cobro',
-      'La app te puede avisar a las 9 de la mañana los días que tenés cobros. ' +
-        'A continuación el celular te va a preguntar si permitís las notificaciones: ' +
-        'tocá "Permitir" para recibir los avisos.',
-      [{ text: 'Entendido', onPress: () => resolve() }],
-      { cancelable: false }
-    );
-  });
+  return avisar(
+    'Avisos de cobro',
+    'La app te puede avisar a las 9 de la mañana los días que tenés cobros. ' +
+      'A continuación el celular te va a preguntar si permitís las notificaciones: ' +
+      'tocá "Permitir" para recibir los avisos.'
+  );
 }

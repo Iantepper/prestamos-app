@@ -14,6 +14,7 @@ export const Colors = {
   onPrimary: '#FFFFFF', // texto sobre verde, ámbar o rojo
   today: '#B7791F', // ámbar: lo que vence hoy
   danger: '#B3261E', // rojo: atrasado, errores y acciones que no se pueden deshacer
+  overlay: 'rgba(0, 0, 0, 0.55)', // fondo oscurecido detrás de los cuadros de confirmación
 } as const;
 
 export type ThemeColor = keyof typeof Colors;

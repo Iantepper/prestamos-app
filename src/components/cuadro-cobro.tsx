@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Alert, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import { BotonGrande } from '@/components/boton-grande';
 import { CampoTexto } from '@/components/campo-texto';
 import { CuadroModal } from '@/components/cuadro-modal';
+import { useConfirmar } from '@/components/dialogos';
 import { Monto } from '@/components/monto';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -37,7 +38,9 @@ export function CuadroCobro({
   const [cobrado, setCobrado] = useState(() => escribirMonto(total));
   const [error, setError] = useState<string>();
 
-  const confirmar = () => {
+  const preguntar = useConfirmar();
+
+  const confirmar = async () => {
     const cobradoNum = leerMonto(cobrado);
     if (!(cobradoNum > 0)) {
       setError('Escribí cuánto te paga, por ejemplo 5000');
@@ -51,17 +54,12 @@ export function CuadroCobro({
     // Lo cobrado cubre primero el recargo por mora y el resto va a la cuota.
     const mora = Math.min(cobradoNum, recargo);
     // Un cobro registrado no se puede borrar: se pide confirmación antes de guardarlo.
-    Alert.alert(
-      '¿Confirmás el cobro?',
-      `Vas a registrar que ${cliente} te pagó ${formatearPesos(cobradoNum)}.`,
-      [
-        { text: 'No, volver', style: 'cancel' },
-        {
-          text: 'Sí, cobré',
-          onPress: () => onConfirmar({ monto: redondear(cobradoNum - mora), mora }),
-        },
-      ]
-    );
+    const seguro = await preguntar({
+      titulo: '¿Confirmás el cobro?',
+      mensaje: `Vas a registrar que ${cliente} te pagó ${formatearPesos(cobradoNum)}.`,
+      confirmar: 'Sí, cobré',
+    });
+    if (seguro) onConfirmar({ monto: redondear(cobradoNum - mora), mora });
   };
 
   return (

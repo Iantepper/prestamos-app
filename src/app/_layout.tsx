@@ -6,6 +6,7 @@ import { LogBox } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';
+import { DialogosProvider } from '@/components/dialogos';
 import { Colors } from '@/constants/theme';
 import { migrarDB } from '@/db/database';
 import { iniciarRecordatorios } from '@/utils/recordatorios';
@@ -38,9 +39,11 @@ export default function TabLayout() {
   return (
     <SQLiteProvider databaseName="prestamos.db" onInit={migrarDB}>
       <ThemeProvider value={temaNavegacion}>
-        <AnimatedSplashOverlay />
-        <Recordatorios />
-        <AppTabs />
+        <DialogosProvider>
+          <AnimatedSplashOverlay />
+          <Recordatorios />
+          <AppTabs />
+        </DialogosProvider>
       </ThemeProvider>
     </SQLiteProvider>
   );
