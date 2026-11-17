@@ -1,4 +1,5 @@
-// Agenda de cobros: cuotas atrasadas, de hoy, de mañana y de los próximos 7 días.
+// Agenda de cobros: una tarjeta por cliente, en la sección más urgente que le corresponda
+// (Atrasadas, Hoy, Mañana o Próximos 7 días).
 import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
@@ -24,7 +25,8 @@ import {
 import { listarCobrosPendientes, type CobroPendiente } from '@/db/agenda';
 import { registrarPago } from '@/db/pagos';
 import { contarClientesYPrestamos } from '@/db/resumen';
-import { formatearFecha, hoyISO, sumarDias } from '@/utils/formato';
+import { agruparPorCliente, type Seccion } from '@/utils/agenda';
+import { formatearDiaMes, hoyISO, sumarDias } from '@/utils/formato';
 import { llamar } from '@/utils/llamar';
 import { calcularMoraPendiente } from '@/utils/mora';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
@@ -35,7 +37,12 @@ const COLOR_VENCIDA = Colors.danger;
 type Cobro = CobroPendiente & { diasAtraso: number; recargo: number; aCobrar: number };
 
 // color: rojo para las atrasadas, ámbar para las de hoy; null para el resto.
-type Grupo = { titulo: string; atrasadas: boolean; color: string | null; cobros: Cobro[] };
+const SECCIONES: { clave: Seccion; titulo: string; color: string | null }[] = [
+  { clave: 'atrasadas', titulo: 'Atrasadas', color: COLOR_VENCIDA },
+  { clave: 'hoy', titulo: 'Hoy', color: Colors.today },
+  { clave: 'manana', titulo: 'Mañana', color: null },
+  { clave: 'proximos', titulo: 'Próximos 7 días', color: null },
+];
 
 export default function AgendaScreen() {
   const db = useSQLiteContext();
@@ -70,7 +77,6 @@ export default function AgendaScreen() {
     }, [db, recarga])
   );
 
-  const manana = sumarDias(hoy, 1);
   const cobros: Cobro[] = filas.map((fila) => {
     const { diasAtraso, recargo } = calcularMoraPendiente(
       {
@@ -85,33 +91,10 @@ export default function AgendaScreen() {
     return { ...fila, diasAtraso, recargo, aCobrar };
   });
 
-  const grupos: Grupo[] = [
-    {
-      titulo: 'Atrasadas',
-      atrasadas: true,
-      color: COLOR_VENCIDA,
-      cobros: cobros.filter((c) => c.fecha_vencimiento < hoy),
-    },
-    {
-      titulo: 'Hoy',
-      atrasadas: false,
-      color: Colors.today,
-      cobros: cobros.filter((c) => c.fecha_vencimiento === hoy),
-    },
-    {
-      titulo: 'Mañana',
-      atrasadas: false,
-      color: null,
-      cobros: cobros.filter((c) => c.fecha_vencimiento === manana),
-    },
-    {
-      titulo: 'Próximos 7 días',
-      atrasadas: false,
-      color: null,
-      cobros: cobros.filter((c) => c.fecha_vencimiento > manana),
-    },
-  ];
-  const [atrasadas, deHoy] = grupos;
+  // El resumen de arriba cuenta cuotas; las tarjetas se agrupan por cliente.
+  const atrasadas = cobros.filter((c) => c.fecha_vencimiento < hoy);
+  const deHoy = cobros.filter((c) => c.fecha_vencimiento === hoy);
+  const porCliente = agruparPorCliente(cobros, hoy);
 
   const cobrar = async (cobro: Cobro, pago: { monto: number; mora: number }) => {
     try {
@@ -163,72 +146,94 @@ export default function AgendaScreen() {
             <>
               <ThemedView type="backgroundElement" style={styles.tarjeta}>
                 <ThemedText style={styles.destacado}>
-                  Hoy tenés que cobrar <Monto valor={sumar(deHoy.cobros)} /> en{' '}
-                  {textoCuotas(deHoy.cobros.length)}
+                  Hoy tenés que cobrar <Monto valor={sumar(deHoy)} /> en {textoCuotas(deHoy.length)}
                 </ThemedText>
-                {atrasadas.cobros.length > 0 ? (
+                {atrasadas.length > 0 ? (
                   <ThemedText style={[styles.texto, styles.vencida]}>
-                    Además tenés {textoCuotas(atrasadas.cobros.length)} atrasadas por{' '}
-                    <Monto valor={sumar(atrasadas.cobros)} />
+                    Además tenés {textoCuotas(atrasadas.length)} atrasadas por{' '}
+                    <Monto valor={sumar(atrasadas)} />
                   </ThemedText>
                 ) : null}
               </ThemedView>
 
-              {grupos
-                .filter((grupo) => grupo.cobros.length > 0)
-                .map((grupo) => (
-                  <View key={grupo.titulo} style={styles.grupo}>
+              {SECCIONES.map((seccion) => {
+                const clientes = porCliente.filter((g) => g.seccion === seccion.clave);
+                if (clientes.length === 0) return null;
+                return (
+                  <View key={seccion.clave} style={styles.grupo}>
                     <ThemedText
                       type="subtitle"
-                      style={[styles.tituloGrupo, grupo.color ? { color: grupo.color } : null]}>
-                      {grupo.titulo}
+                      style={[styles.tituloGrupo, seccion.color ? { color: seccion.color } : null]}>
+                      {seccion.titulo}
                     </ThemedText>
-                    {grupo.cobros.map((cobro) => (
-                      <ThemedView
-                        key={cobro.cuota_id}
-                        type="backgroundElement"
-                        style={[styles.tarjeta, grupo.color ? bordeDestacado(grupo.color) : null]}>
-                        <ThemedText style={styles.destacado}>{cobro.cliente_nombre}</ThemedText>
-                        <ThemedText style={styles.destacado}>
-                          Cobrar: <Monto valor={cobro.aCobrar} />
-                        </ThemedText>
-                        {grupo.atrasadas ? (
-                          <ThemedText style={[styles.texto, styles.vencida]}>
-                            Vencida hace {textoDias(cobro.diasAtraso)}
-                          </ThemedText>
-                        ) : (
-                          <ThemedText style={styles.texto}>
-                            Vence el {formatearFecha(cobro.fecha_vencimiento)}
-                          </ThemedText>
-                        )}
-                        <ThemedText style={styles.texto}>{cobro.direccion}</ThemedText>
-                        {cobro.telefono ? (
-                          <ThemedText style={styles.texto}>Tel: {cobro.telefono}</ThemedText>
-                        ) : null}
-                        <View style={styles.botones}>
-                          <View style={styles.filaBotones}>
-                            <BotonGrande
-                              texto="Cómo llegar"
-                              variante="secundario"
-                              onPress={() => abrirMapa(cobro.direccion)}
-                              style={styles.botonFila}
-                            />
-                            {cobro.telefono ? (
+                    {clientes.map((grupo) => {
+                      const cliente = grupo.cuotas[0];
+                      return (
+                        <ThemedView
+                          key={grupo.clienteId}
+                          type="backgroundElement"
+                          style={[
+                            styles.tarjeta,
+                            seccion.color ? bordeDestacado(seccion.color) : null,
+                          ]}>
+                          <ThemedText style={styles.destacado}>{cliente.cliente_nombre}</ThemedText>
+                          {grupo.cobrarAhora > 0 ? (
+                            <>
+                              <ThemedText style={styles.destacado}>
+                                Cobrar ahora: <Monto valor={grupo.cobrarAhora} />
+                              </ThemedText>
+                              <ThemedText
+                                style={[styles.texto, grupo.diasMasVieja > 0 && styles.vencida]}>
+                                {textoCuotas(grupo.cuotasAhora)}
+                                {grupo.diasMasVieja > 0
+                                  ? `, la más vieja venció hace ${textoDias(grupo.diasMasVieja)}`
+                                  : ', vence hoy'}
+                              </ThemedText>
+                            </>
+                          ) : null}
+                          {grupo.despues > 0 && grupo.fechaDespues ? (
+                            <ThemedText
+                              style={grupo.cobrarAhora > 0 ? styles.texto : styles.destacado}>
+                              {grupo.cobrarAhora > 0 ? 'Después' : 'Cobrar'}:{' '}
+                              <Monto valor={grupo.despues} /> el{' '}
+                              {formatearDiaMes(grupo.fechaDespues)}
+                            </ThemedText>
+                          ) : null}
+                          {grupo.cobrarAhora === 0 ? (
+                            <ThemedText style={styles.texto}>
+                              {textoCuotas(grupo.cuotas.length)}
+                            </ThemedText>
+                          ) : null}
+                          <ThemedText style={styles.texto}>{cliente.direccion}</ThemedText>
+                          {cliente.telefono ? (
+                            <ThemedText style={styles.texto}>Tel: {cliente.telefono}</ThemedText>
+                          ) : null}
+                          <View style={styles.botones}>
+                            <View style={styles.filaBotones}>
                               <BotonGrande
-                                texto="Llamar"
+                                texto="Cómo llegar"
                                 variante="secundario"
-                                icono={{ ios: 'phone.fill', android: 'call', web: 'call' }}
-                                onPress={() => llamar(cobro.telefono ?? '')}
+                                onPress={() => abrirMapa(cliente.direccion)}
                                 style={styles.botonFila}
                               />
-                            ) : null}
+                              {cliente.telefono ? (
+                                <BotonGrande
+                                  texto="Llamar"
+                                  variante="secundario"
+                                  icono={{ ios: 'phone.fill', android: 'call', web: 'call' }}
+                                  onPress={() => llamar(cliente.telefono ?? '')}
+                                  style={styles.botonFila}
+                                />
+                              ) : null}
+                            </View>
+                            <BotonGrande texto="Cobrar" onPress={() => setCobroACobrar(cliente)} />
                           </View>
-                          <BotonGrande texto="Cobrar" onPress={() => setCobroACobrar(cobro)} />
-                        </View>
-                      </ThemedView>
-                    ))}
+                        </ThemedView>
+                      );
+                    })}
                   </View>
-                ))}
+                );
+              })}
             </>
           )}
         </ScrollView>

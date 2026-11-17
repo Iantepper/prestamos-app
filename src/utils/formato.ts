@@ -18,6 +18,12 @@ export function formatearFecha(fechaISO: string): string {
   return `${dia}/${mes}/${anio}`;
 }
 
+// 'YYYY-MM-DD' -> 'DD/MM' (para fechas cercanas, donde el año se sobreentiende).
+export function formatearDiaMes(fechaISO: string): string {
+  const [, mes, dia] = fechaISO.split('-');
+  return `${dia}/${mes}`;
+}
+
 // 'DD/MM/AAAA' -> 'YYYY-MM-DD', o null si no es una fecha válida.
 export function leerFecha(texto: string): string | null {
   const partes = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(texto.trim());

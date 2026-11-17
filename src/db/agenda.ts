@@ -3,6 +3,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export type CobroPendiente = {
+  cliente_id: number;
   cuota_id: number;
   numero: number;
   fecha_vencimiento: string; // 'YYYY-MM-DD'
@@ -23,7 +24,8 @@ export async function listarCobrosPendientes(
   return db.getAllAsync<CobroPendiente>(
     `SELECT q.id AS cuota_id, q.numero, q.fecha_vencimiento, q.monto, q.monto_pagado,
             (SELECT COALESCE(SUM(g.mora), 0) FROM pagos g WHERE g.cuota_id = q.id) AS mora_pagada,
-            p.mora_diaria_pct, c.nombre AS cliente_nombre, c.telefono, c.direccion
+            p.mora_diaria_pct, c.id AS cliente_id, c.nombre AS cliente_nombre, c.telefono,
+            c.direccion
        FROM cuotas q
        JOIN prestamos p ON p.id = q.prestamo_id
        JOIN clientes c ON c.id = p.cliente_id
