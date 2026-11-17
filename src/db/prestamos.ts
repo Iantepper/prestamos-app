@@ -4,7 +4,25 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { calcularCuotas, type DatosPrestamo, type Frecuencia } from '@/utils/cuotas';
 
+// Error de crearPrestamo cuando el cliente ya tiene un préstamo activo.
+export class ClienteConPrestamoActivoError extends Error {
+  constructor() {
+    super('El cliente ya tiene un préstamo activo');
+    this.name = 'ClienteConPrestamoActivoError';
+  }
+}
+
+// Ids de los clientes que tienen un préstamo activo (cada cliente puede tener uno solo).
+export async function clientesConPrestamoActivo(db: SQLiteDatabase): Promise<Set<number>> {
+  const filas = await db.getAllAsync<{ cliente_id: number }>(
+    "SELECT DISTINCT cliente_id FROM prestamos WHERE estado = 'activo'"
+  );
+  return new Set(filas.map((f) => f.cliente_id));
+}
+
 // Guarda el préstamo y todas sus cuotas en una sola transacción. Devuelve el id del préstamo.
+// Cada cliente puede tener un solo préstamo activo: si ya tiene uno, no guarda nada y lanza
+// ClienteConPrestamoActivoError.
 export async function crearPrestamo(
   db: SQLiteDatabase,
   clienteId: number,
@@ -15,6 +33,12 @@ export async function crearPrestamo(
   let prestamoId = 0;
 
   await db.withTransactionAsync(async () => {
+    const activos = await db.getFirstAsync<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM prestamos WHERE cliente_id = ? AND estado = 'activo'",
+      [clienteId]
+    );
+    if ((activos?.n ?? 0) > 0) throw new ClienteConPrestamoActivoError();
+
     const resultado = await db.runAsync(
       `INSERT INTO prestamos
          (cliente_id, monto, tasa_interes, cant_cuotas, frecuencia, fecha_inicio, mora_diaria_pct)

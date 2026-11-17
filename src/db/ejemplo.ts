@@ -19,7 +19,8 @@ export async function hayDatos(db: SQLiteDatabase): Promise<boolean> {
 //   Jorge (Con atrasos): una cuota pagada tarde y otra vencida hace 3 días.
 //   Carlos (Riesgo): una cuota vencida hace unos 20 días.
 //   Ana (Nuevo): un préstamo que empieza hoy, sin cuotas vencidas.
-// Las fechas se calculan a partir de hoy, así la demo funciona cualquier día. Sin recargo por mora
+// Cada cliente tiene un solo préstamo activo (el de Rosa que está saldado se paga antes de crear
+// el nuevo, porque crearPrestamo no permite dos activos). Las fechas se calculan a partir de hoy, así la demo funciona cualquier día. Sin recargo por mora
 // (mora_diaria_pct = 0), como los préstamos nuevos.
 export async function cargarDatosDeEjemplo(db: SQLiteDatabase): Promise<void> {
   const hoy = hoyISO();

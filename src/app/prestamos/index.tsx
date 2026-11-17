@@ -23,7 +23,13 @@ import {
   Spacing,
 } from '@/constants/theme';
 import { listarClientes, type Cliente } from '@/db/clientes';
-import { crearPrestamo, listarPrestamos, type PrestamoListado } from '@/db/prestamos';
+import {
+  ClienteConPrestamoActivoError,
+  clientesConPrestamoActivo,
+  crearPrestamo,
+  listarPrestamos,
+  type PrestamoListado,
+} from '@/db/prestamos';
 import { obtenerPerfilesRiesgo } from '@/db/riesgo';
 import {
   calcularCuotas,
@@ -70,6 +76,8 @@ export default function PrestamosScreen() {
 
   const [prestamos, setPrestamos] = useState<PrestamoListado[]>([]);
   const [perfiles, setPerfiles] = useState<Map<number, NivelRiesgo>>(new Map());
+  // Clientes que ya tienen un préstamo activo: no se les puede dar otro.
+  const [conPrestamo, setConPrestamo] = useState<Set<number>>(new Set());
   const [verSaldados, setVerSaldados] = useState(false);
   const [recarga, setRecarga] = useState(0);
 
@@ -82,10 +90,16 @@ export default function PrestamosScreen() {
         listarClientes(db),
         listarPrestamos(db, verSaldados ? 'saldado' : 'activo'),
         obtenerPerfilesRiesgo(db, hoyISO()),
-      ]).then(([filasClientes, filasPrestamos, perfilesClientes]) => {
+        clientesConPrestamoActivo(db),
+      ]).then(([filasClientes, filasPrestamos, perfilesClientes, idsConPrestamo]) => {
         if (!activo) return;
         setClientes(filasClientes);
-        setClienteId((id) => (filasClientes.some((c) => c.id === id) ? id : null));
+        setConPrestamo(idsConPrestamo);
+        setClienteId((id) =>
+          id !== null && filasClientes.some((c) => c.id === id) && !idsConPrestamo.has(id)
+            ? id
+            : null
+        );
         setPrestamos(filasPrestamos);
         setPerfiles(perfilesClientes);
       });
@@ -143,8 +157,15 @@ export default function PrestamosScreen() {
     try {
       // Sin recargo por mora: el prestamista no la cobra (mora_diaria_pct queda en 0).
       await crearPrestamo(db, clienteId, datos);
-    } catch {
-      avisar('No se pudo guardar', 'Probá de nuevo.');
+    } catch (error) {
+      if (error instanceof ClienteConPrestamoActivoError) {
+        avisar(
+          'Este cliente ya tiene un préstamo activo',
+          'Podés renovarlo desde el detalle de su préstamo.'
+        );
+      } else {
+        avisar('No se pudo guardar', 'Probá de nuevo.');
+      }
       return;
     }
     setClienteId(null);
@@ -208,8 +229,18 @@ export default function PrestamosScreen() {
                     texto={cliente.nombre}
                     detalle={cliente.direccion}
                     seleccionada={cliente.id === clienteId}
-                    onPress={() => setClienteId(cliente.id)}>
+                    onPress={() =>
+                      conPrestamo.has(cliente.id)
+                        ? avisar(
+                            'Este cliente ya tiene un préstamo activo',
+                            'Podés renovarlo desde el detalle de su préstamo.'
+                          )
+                        : setClienteId(cliente.id)
+                    }>
                     <IndicadorRiesgo nivel={perfiles.get(cliente.id) ?? 'nuevo'} />
+                    {conPrestamo.has(cliente.id) ? (
+                      <ThemedText style={styles.yaTienePrestamo}>Ya tiene un préstamo</ThemedText>
+                    ) : null}
                   </OpcionGrande>
                 ))}
                 {hayMasCoincidencias ? (
@@ -407,6 +438,12 @@ const styles = StyleSheet.create({
   },
   error: {
     color: COLOR_ERROR,
+  },
+  yaTienePrestamo: {
+    color: Colors.textSecondary,
+    fontSize: 20,
+    lineHeight: 28,
+    fontWeight: '700',
   },
   avisoRiesgo: { ...EstiloTarjeta, ...bordeDestacado(COLOR_ERROR) },
   textoAvisoRiesgo: {
