@@ -22,6 +22,9 @@ Tablas: `clientes` (nombre, telefono, direccion obligatoria, notas), `prestamos`
 ## Decisión de negocio: cálculo de cuotas (src/utils/cuotas.ts, ya creado)
 Interés simple sobre el total: total = monto + monto × tasa%; cuota = total / cantidad de cuotas, todas iguales (la última absorbe el redondeo). La primera cuota vence un período después de la fecha de inicio (semanal 7 días, quincenal 14, mensual 1 mes).
 
+## Decisión de negocio: sin recargo por mora
+El prestamista entrevistado no cobra mora. El alta de préstamo ya no tiene el campo "Recargo por mora" y los préstamos nuevos guardan `mora_diaria_pct = 0` (también los datos de ejemplo). La lógica de mora (`src/utils/mora.ts`, la columna `mora_diaria_pct`, `pagos.mora`) queda dormida: los préstamos viejos con mora siguen calculándola y mostrándola. Con mora 0 no aparece ninguna línea de mora ni de recargo en la Agenda, los cobros, el detalle ni el Resumen.
+
 ## Decisión de negocio: perfil de riesgo del cliente (src/utils/riesgo.ts)
 Se calcula con todos los préstamos del cliente (`obtenerPerfilesRiesgo` en `src/db/riesgo.ts`). Pago tardío = un pago con fecha posterior al vencimiento de su cuota (se cuenta cada pago, también los parciales). Se evalúa en este orden:
 1. **Riesgo** (rojo): 3 o más pagos tardíos en los últimos 90 días, o alguna cuota vencida hace 15 días o más.

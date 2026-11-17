@@ -25,12 +25,12 @@ import { calcularMoraPendiente } from '@/utils/mora';
 
 const COLOR_VENCIDA = Colors.danger;
 
-type Atrasos = { cantidad: number; monto: number };
+type Atrasos = { cantidad: number; monto: number; recargo: number };
 
 export default function ResumenScreen() {
   const db = useSQLiteContext();
   const [resumen, setResumen] = useState<Resumen | null>(null);
-  const [atrasos, setAtrasos] = useState<Atrasos>({ cantidad: 0, monto: 0 });
+  const [atrasos, setAtrasos] = useState<Atrasos>({ cantidad: 0, monto: 0, recargo: 0 });
 
   // Se recarga cada vez que se entra a la pestaña.
   useFocusEffect(
@@ -41,6 +41,7 @@ export default function ResumenScreen() {
       Promise.all([obtenerResumen(db), listarCobrosPendientes(db, sumarDias(hoy, -1))]).then(
         ([filaResumen, atrasadas]) => {
           if (!activo) return;
+          let recargoTotal = 0;
           const monto = atrasadas.reduce((suma, cuota) => {
             const { recargo } = calcularMoraPendiente(
               {
@@ -51,10 +52,15 @@ export default function ResumenScreen() {
               cuota.mora_diaria_pct,
               hoy
             );
+            recargoTotal += recargo;
             return suma + cuota.monto - cuota.monto_pagado + recargo;
           }, 0);
           setResumen(filaResumen);
-          setAtrasos({ cantidad: atrasadas.length, monto: Math.round(monto * 100) / 100 });
+          setAtrasos({
+            cantidad: atrasadas.length,
+            monto: Math.round(monto * 100) / 100,
+            recargo: recargoTotal,
+          });
         }
       );
       return () => {
@@ -119,7 +125,7 @@ export default function ResumenScreen() {
                     ? 'Ninguna'
                     : `${atrasos.cantidad} por ${formatearPesos(atrasos.monto)}`
                 }
-                detalle={atrasos.cantidad > 0 ? 'Con el recargo por mora incluido' : undefined}
+                detalle={atrasos.recargo > 0 ? 'Con el recargo por mora incluido' : undefined}
                 alerta={atrasos.cantidad > 0}
               />
               <Tarjeta titulo="Préstamos activos" valor={String(resumen.prestamos_activos)} />
