@@ -334,6 +334,7 @@ export default function RenovarScreen() {
                   <ComoPaga
                     plan={planDescuento(descuento.valor, prestamo.frecuencia)}
                     cuotaAntes={cuotaAntes}
+                    gruposAntes={gruposHoy}
                   />
                   <LineaTotal plan={planDescuento(descuento.valor, prestamo.frecuencia)} />
                   <BotonGrande
@@ -356,6 +357,7 @@ export default function RenovarScreen() {
                   <ComoPaga
                     plan={planSuma(suma.valor, pendientes, prestamo.frecuencia)}
                     cuotaAntes={cuotaAntes}
+                    gruposAntes={gruposHoy}
                   />
                   <LineaTotal plan={planSuma(suma.valor, pendientes, prestamo.frecuencia)} />
                   <BotonGrande
@@ -508,7 +510,15 @@ function planSuma(r: ResultadoSuma, pendientes: CuotaActual[], frecuencia: Frecu
   };
 }
 
-function ComoPaga({ plan, cuotaAntes }: { plan: Plan; cuotaAntes?: number }) {
+function ComoPaga({
+  plan,
+  cuotaAntes,
+  gruposAntes = [],
+}: {
+  plan: Plan;
+  cuotaAntes?: number;
+  gruposAntes?: GrupoCuotas[]; // las cuotas pendientes antes de renovar
+}) {
   return (
     <>
       <ThemedText style={styles.destacado}>
@@ -520,7 +530,10 @@ function ComoPaga({ plan, cuotaAntes }: { plan: Plan; cuotaAntes?: number }) {
       </ThemedText>
       {cuotaAntes !== undefined ? (
         <ThemedText themeColor="textSecondary" style={styles.texto}>
-          Hoy paga {formatearPesos(cuotaAntes)} por cuota
+          Hasta ahora pagaba{' '}
+          {gruposAntes.length > 1
+            ? textoCronograma(gruposAntes, plan.frecuencia)
+            : `${formatearPesos(cuotaAntes)} por cuota`}
         </ThemedText>
       ) : null}
       <ThemedText style={styles.entregaLinea}>
