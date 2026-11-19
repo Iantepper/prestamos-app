@@ -169,6 +169,9 @@ export default function RenovarScreen() {
   const pagas = vigentes.filter((q) => q.estado === 'pagada').length;
   const cobrado = vigentes.reduce((s, q) => s + q.montoPagado, 0);
   const cuotaAntes = pendientes[0].monto;
+  const proxima = pendientes[0];
+  const faltaProxima = Math.round((proxima.monto - proxima.montoPagado) * 100) / 100;
+  const gruposHoy = resumirCuotas(pendientes);
   const planElegido =
     modo === 'descuento'
       ? descuento.valor && planDescuento(descuento.valor, prestamo.frecuencia)
@@ -227,9 +230,33 @@ export default function RenovarScreen() {
         {paso === 1 ? (
           <>
             <ThemedView type="backgroundElement" style={styles.tarjeta}>
-              <ThemedText style={styles.destacado}>
-                Lo que debe hoy: <Monto valor={deuda} /> en {textoCuotas(pendientes.length)}
+              <ThemedText style={styles.destacado}>Préstamo actual</ThemedText>
+              <ThemedText style={styles.texto}>
+                Monto original: <Monto valor={prestamo.monto} />
               </ThemedText>
+              <ThemedText style={styles.texto}>Interés: {prestamo.tasa_interes} %</ThemedText>
+              <ThemedText style={styles.texto}>
+                Cuotas pagas: {pagas} de {vigentes.length}
+              </ThemedText>
+              {gruposHoy.length === 1 ? (
+                <ThemedText style={styles.texto}>
+                  Cada cuota: <Monto valor={gruposHoy[0].monto} />
+                </ThemedText>
+              ) : (
+                <ThemedText style={styles.texto}>
+                  Cuotas que quedan: {textoCronograma(gruposHoy, prestamo.frecuencia)}
+                </ThemedText>
+              )}
+              <ThemedText style={styles.texto}>
+                Próxima cuota: <Monto valor={faltaProxima} /> el{' '}
+                {formatearFecha(proxima.fechaVencimiento)}
+              </ThemedText>
+              <View style={styles.debeHoy}>
+                <ThemedText style={styles.titulo}>
+                  Debe hoy: <Monto valor={deuda} />
+                </ThemedText>
+                <ThemedText style={styles.texto}>en {textoCuotas(pendientes.length)}</ThemedText>
+              </View>
             </ThemedView>
 
             <CampoTexto
@@ -567,6 +594,12 @@ const styles = StyleSheet.create({
   },
   tarjeta: EstiloTarjeta,
   entrega: bordeDestacado(Colors.primary),
+  debeHoy: {
+    marginTop: Spacing.two,
+    paddingTop: Spacing.two,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
   titulo: {
     fontSize: 26,
     lineHeight: 34,
