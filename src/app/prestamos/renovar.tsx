@@ -177,6 +177,10 @@ export default function RenovarScreen() {
   const pagas = vigentes.filter((q) => q.estado === 'pagada').length;
   const cobrado = vigentes.reduce((s, q) => s + q.montoPagado, 0);
   const cuotaAntes = pendientes[0].monto;
+  const planElegido =
+    modo === 'descuento'
+      ? descuento.valor && planDescuento(descuento.valor, frecuenciaNueva)
+      : suma.valor && planSuma(suma.valor, pendientes, prestamo.frecuencia);
 
   const confirmarRenovacion = async () => {
     const elegido = modo === 'descuento' ? descuento.valor : suma.valor;
@@ -360,6 +364,13 @@ export default function RenovarScreen() {
           <>
             <ThemedText style={styles.titulo}>Revisá antes de confirmar</ThemedText>
 
+            {planElegido ? (
+              <ThemedView type="backgroundElement" style={[styles.tarjeta, styles.entrega]}>
+                <ThemedText style={styles.titulo}>Cómo va a pagar</ThemedText>
+                <ComoPaga plan={planElegido} />
+              </ThemedView>
+            ) : null}
+
             <ThemedView type="backgroundElement" style={styles.tarjeta}>
               <ThemedText style={styles.destacado}>Préstamo actual</ThemedText>
               <ThemedText style={styles.texto}>
@@ -403,34 +414,6 @@ export default function RenovarScreen() {
               ) : null}
             </ThemedView>
 
-            <ThemedView type="backgroundElement" style={[styles.tarjeta, styles.entrega]}>
-              <ThemedText style={styles.titulo}>
-                Le entregás hoy:{' '}
-                <Monto
-                  valor={
-                    (modo === 'descuento' ? descuento.valor?.entregado : suma.valor?.entregado) ?? 0
-                  }
-                />
-              </ThemedText>
-              <ThemedText style={styles.texto}>
-                Antes pagaba <Monto valor={cuotaAntes} /> por cuota, ahora{' '}
-                <Monto
-                  valor={
-                    (modo === 'descuento'
-                      ? descuento.valor?.cuotas[0].monto
-                      : (suma.valor?.modificadas[0]?.monto ?? 0)) ?? 0
-                  }
-                />
-              </ThemedText>
-              <ThemedText style={styles.texto}>
-                La última cuota vence el{' '}
-                {formatearFecha(
-                  (modo === 'descuento' ? descuento.valor?.ultimaFecha : suma.valor?.ultimaFecha) ??
-                    hoyISO()
-                )}
-              </ThemedText>
-            </ThemedView>
-
             <ThemedView type="backgroundElement" style={styles.tarjeta}>
               <ThemedText style={styles.destacado}>Cómo viene pagando</ThemedText>
               <IndicadorRiesgo nivel={perfil} />
@@ -442,6 +425,8 @@ export default function RenovarScreen() {
                 </ThemedView>
               ) : null}
             </ThemedView>
+
+            {planElegido ? <LineaTotal plan={planElegido} /> : null}
 
             <BotonGrande texto="Confirmar renovación" onPress={confirmarRenovacion} />
             <BotonGrande
