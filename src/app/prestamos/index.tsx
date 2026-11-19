@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BotonGrande } from '@/components/boton-grande';
+import { CampoMonto, useMonto } from '@/components/campo-monto';
 import { CampoTexto } from '@/components/campo-texto';
 import { useAviso, useConfirmar } from '@/components/dialogos';
 import { IndicadorRiesgo } from '@/components/indicador-riesgo';
@@ -61,7 +62,7 @@ export default function PrestamosScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const [clienteId, setClienteId] = useState<number | null>(null);
   const [busqueda, setBusqueda] = useState('');
-  const [monto, setMonto] = useState('');
+  const monto = useMonto({ enteros: true });
   const [tasa, setTasa] = useState('');
   const [cuotas, setCuotas] = useState('');
   const [frecuencia, setFrecuencia] = useState<Frecuencia>('mensual');
@@ -118,7 +119,7 @@ export default function PrestamosScreen() {
   const clientesVisibles =
     clienteElegido && !primeros.includes(clienteElegido) ? [clienteElegido, ...primeros] : primeros;
 
-  const montoNum = leerEntero(monto);
+  const montoNum = monto.numero;
   const tasaNum = leerDecimal(tasa);
   const cuotasNum = leerEntero(cuotas);
   const fechaISO = leerFecha(fecha);
@@ -180,7 +181,7 @@ export default function PrestamosScreen() {
     }
     setClienteId(null);
     setBusqueda('');
-    setMonto('');
+    monto.cambiar('');
     setTasa('');
     setCuotas('');
     setFrecuencia('mensual');
@@ -260,13 +261,11 @@ export default function PrestamosScreen() {
                 ) : null}
               </View>
 
-              <CampoTexto
+              <CampoMonto
                 etiqueta="Monto que prestás ($) *"
-                value={monto}
-                onChangeText={setMonto}
+                monto={monto}
                 error={errores.monto}
-                keyboardType="number-pad"
-                placeholder="Ej: 100000"
+                placeholder="Ej: 100.000"
               />
               <CampoTexto
                 etiqueta="Interés total (%) *"

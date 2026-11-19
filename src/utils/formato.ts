@@ -57,14 +57,29 @@ export function leerDecimal(texto: string): number {
   return /^\d+(\.\d+)?$/.test(limpio) ? Number(limpio) : NaN;
 }
 
-// Monto en pesos escrito por el usuario: acepta "10500", "10.500", "3333,33" o "3333.33".
-// NaN si no es válido.
-export function leerMonto(texto: string): number {
-  const limpio = texto.replace(/[\s$]/g, '');
-  if (/^\d{1,3}(\.\d{3})+(,\d{1,2})?$/.test(limpio)) {
-    return Number(limpio.replace(/\./g, '').replace(',', '.'));
-  }
-  return /^\d+([.,]\d{1,2})?$/.test(limpio) ? Number(limpio.replace(',', '.')) : NaN;
+// Hasta 12 cifras enteras: alcanza de sobra y el número no pierde precisión.
+const MAX_CIFRAS_MONTO = 12;
+
+// Texto de un campo de plata mientras se escribe: "1500000" -> "1.500.000", "3333,3" -> "3.333,3".
+// Los puntos son siempre de miles; los centavos van después de la coma (máximo 2). Un punto al final
+// se toma como coma, porque algunos teclados numéricos solo tienen punto.
+export function formatearMontoEscrito(texto: string, opciones?: { enteros?: boolean }): string {
+  const [entera, ...resto] = texto.replace(/\.$/, ',').split(',');
+  const cifras = entera
+    .replace(/\D/g, '')
+    .replace(/^0+(?=\d)/, '')
+    .slice(0, MAX_CIFRAS_MONTO);
+  const conPuntos = cifras.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  if (opciones?.enteros || resto.length === 0) return conPuntos;
+  return `${conPuntos || '0'},${resto.join('').replace(/\D/g, '').slice(0, 2)}`;
+}
+
+// Número limpio de un campo de plata: "1.500.000" -> 1500000, "3.333,33" -> 3333.33. También acepta
+// el valor sin puntos. NaN si está vacío.
+export function limpiarMonto(texto: string): number {
+  const [entera, decimales = ''] = texto.replace(/[^\d,]/g, '').split(',');
+  if (!entera && !decimales) return NaN;
+  return Number(`${entera || '0'}.${decimales || '0'}`);
 }
 
 // Monto para precargar en un campo de texto: "10500" o "3333,33".

@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { BotonGrande } from '@/components/boton-grande';
-import { CampoTexto } from '@/components/campo-texto';
+import { CampoMonto, useMonto } from '@/components/campo-monto';
 import { CuadroModal } from '@/components/cuadro-modal';
 import { useConfirmar } from '@/components/dialogos';
 import { Monto } from '@/components/monto';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { EstiloTarjeta } from '@/constants/theme';
-import { escribirMonto, formatearPesos, leerMonto } from '@/utils/formato';
+import { formatearPesos } from '@/utils/formato';
 
 type Props = {
   numeroCuota: number;
@@ -35,15 +35,15 @@ export function CuadroCobro({
   onCancelar,
 }: Props) {
   const total = redondear(montoCuota - montoPagado + recargo);
-  const [cobrado, setCobrado] = useState(() => escribirMonto(total));
+  const cobrado = useMonto({ inicial: total });
   const [error, setError] = useState<string>();
 
   const preguntar = useConfirmar();
 
   const confirmar = async () => {
-    const cobradoNum = leerMonto(cobrado);
+    const cobradoNum = cobrado.numero;
     if (!(cobradoNum > 0)) {
-      setError('Escribí cuánto te paga, por ejemplo 5000');
+      setError('Escribí cuánto te paga, por ejemplo 5.000');
       return;
     }
     if (cobradoNum > total) {
@@ -83,13 +83,7 @@ export function CuadroCobro({
         </ThemedText>
       </ThemedView>
 
-      <CampoTexto
-        etiqueta="Cuánto te paga ahora ($)"
-        value={cobrado}
-        onChangeText={setCobrado}
-        error={error}
-        keyboardType="decimal-pad"
-      />
+      <CampoMonto etiqueta="Cuánto te paga ahora ($)" monto={cobrado} error={error} />
 
       <BotonGrande texto="Confirmar cobro" onPress={confirmar} />
       <BotonGrande texto="Cancelar" variante="secundario" onPress={onCancelar} />

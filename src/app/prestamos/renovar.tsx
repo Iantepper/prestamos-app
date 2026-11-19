@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { BotonGrande } from '@/components/boton-grande';
+import { CampoMonto, useMonto } from '@/components/campo-monto';
 import { CampoTexto } from '@/components/campo-texto';
 import { useAviso, useConfirmar } from '@/components/dialogos';
 import { IndicadorRiesgo } from '@/components/indicador-riesgo';
@@ -87,7 +88,7 @@ export default function RenovarScreen() {
 
   const [paso, setPaso] = useState<1 | 2 | 3>(1);
   const [modo, setModo] = useState<Modo>('descuento');
-  const [monto, setMonto] = useState('');
+  const entrega = useMonto({ enteros: true });
   const [tasa, setTasa] = useState('');
   const [cantCuotas, setCantCuotas] = useState('');
   const [fecha, setFecha] = useState(() => formatearFecha(hoyISO()));
@@ -133,7 +134,7 @@ export default function RenovarScreen() {
   }
 
   const deuda = calcularDeuda(cuotas);
-  const entregaNum = leerEntero(monto);
+  const entregaNum = entrega.numero;
   const tasaNum = leerDecimal(tasa);
   const cuotasNum = leerEntero(cantCuotas);
   const fechaISO = leerFecha(fecha);
@@ -259,13 +260,11 @@ export default function RenovarScreen() {
               </View>
             </ThemedView>
 
-            <CampoTexto
+            <CampoMonto
               etiqueta="¿Cuánta plata le vas a dar en mano? ($)"
-              value={monto}
-              onChangeText={setMonto}
+              monto={entrega}
               error={errores.monto}
-              keyboardType="number-pad"
-              placeholder="Ej: 50000"
+              placeholder="Ej: 50.000"
             />
             <CampoTexto
               etiqueta="Interés total (%)"

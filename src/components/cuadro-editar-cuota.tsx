@@ -1,17 +1,12 @@
 import { useState } from 'react';
 
 import { BotonGrande } from '@/components/boton-grande';
+import { CampoMonto, useMonto } from '@/components/campo-monto';
 import { CampoTexto } from '@/components/campo-texto';
 import { CuadroModal } from '@/components/cuadro-modal';
 import { Monto } from '@/components/monto';
 import { ThemedText } from '@/components/themed-text';
-import {
-  escribirMonto,
-  formatearFecha,
-  formatearPesos,
-  leerFecha,
-  leerMonto,
-} from '@/utils/formato';
+import { formatearFecha, formatearPesos, leerFecha } from '@/utils/formato';
 
 type Props = {
   numeroCuota: number;
@@ -34,12 +29,12 @@ export function CuadroEditarCuota({
   onCancelar,
 }: Props) {
   const [fecha, setFecha] = useState(() => formatearFecha(fechaVencimiento));
-  const [montoTexto, setMontoTexto] = useState(() => escribirMonto(monto));
+  const montoCampo = useMonto({ inicial: monto });
   const [errores, setErrores] = useState<Errores>({});
 
   const guardar = () => {
     const fechaISO = leerFecha(fecha);
-    const montoNum = leerMonto(montoTexto);
+    const montoNum = montoCampo.numero;
     const nuevos: Errores = {};
     if (!fechaISO) nuevos.fecha = 'Escribí la fecha como día/mes/año. Ej: 05/11/2026';
     if (!(montoNum > 0)) {
@@ -67,13 +62,7 @@ export function CuadroEditarCuota({
         keyboardType="numbers-and-punctuation"
         placeholder="Ej: 05/11/2026"
       />
-      <CampoTexto
-        etiqueta="Monto de la cuota ($)"
-        value={montoTexto}
-        onChangeText={setMontoTexto}
-        error={errores.monto}
-        keyboardType="decimal-pad"
-      />
+      <CampoMonto etiqueta="Monto de la cuota ($)" monto={montoCampo} error={errores.monto} />
       <BotonGrande texto="Guardar cambios" onPress={guardar} />
       <BotonGrande texto="Cancelar" variante="secundario" onPress={onCancelar} />
     </CuadroModal>

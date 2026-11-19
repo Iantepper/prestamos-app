@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { BotonGrande } from '@/components/boton-grande';
-import { CampoTexto } from '@/components/campo-texto';
+import { CampoMonto, useMonto } from '@/components/campo-monto';
 import { CuadroModal } from '@/components/cuadro-modal';
 import { useConfirmar } from '@/components/dialogos';
 import { Monto } from '@/components/monto';
@@ -11,7 +11,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { EstiloTarjeta, Spacing } from '@/constants/theme';
 import { listarCuotasPendientesCliente } from '@/db/pagos';
-import { escribirMonto, formatearPesos, hoyISO, leerMonto } from '@/utils/formato';
+import { formatearPesos, hoyISO } from '@/utils/formato';
 import { repartirPago, saldoTotal, type CuotaPendiente } from '@/utils/reparto';
 
 type Props = {
@@ -34,7 +34,7 @@ export function CuadroCobroCliente({
   const db = useSQLiteContext();
   const preguntar = useConfirmar();
   const [cuotas, setCuotas] = useState<CuotaPendiente[] | null>(null);
-  const [pagado, setPagado] = useState(() => escribirMonto(montoInicial));
+  const pagado = useMonto({ inicial: montoInicial });
   const [error, setError] = useState<string>();
 
   useEffect(() => {
@@ -48,13 +48,13 @@ export function CuadroCobroCliente({
   }, [db, clienteId]);
 
   const saldo = cuotas ? saldoTotal(cuotas) : 0;
-  const montoNum = leerMonto(pagado);
+  const montoNum = pagado.numero;
   const valido = cuotas !== null && montoNum > 0 && montoNum <= saldo;
   const aplicaciones = valido ? repartirPago(cuotas, montoNum) : [];
 
   const confirmar = async () => {
     if (!(montoNum > 0)) {
-      setError('Escribí cuánto te pagó, por ejemplo 5000');
+      setError('Escribí cuánto te pagó, por ejemplo 5.000');
       return;
     }
     if (montoNum > saldo) {
@@ -86,13 +86,7 @@ export function CuadroCobroCliente({
         ) : null}
       </ThemedView>
 
-      <CampoTexto
-        etiqueta="¿Cuánto te pagó? ($)"
-        value={pagado}
-        onChangeText={setPagado}
-        error={error}
-        keyboardType="decimal-pad"
-      />
+      <CampoMonto etiqueta="¿Cuánto te pagó? ($)" monto={pagado} error={error} />
 
       {aplicaciones.length > 0 ? (
         <View style={styles.reparto}>
