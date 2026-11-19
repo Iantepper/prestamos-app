@@ -21,7 +21,7 @@ export async function hayDatos(db: SQLiteDatabase): Promise<boolean> {
 //   Carlos (Riesgo): dos cuotas vencidas sin cobrar.
 //   Ana (Nuevo): un préstamo que empieza hoy, sin cuotas vencidas.
 //   Laura (Cumplidor): $ 100.000 al 20 % en 4 cuotas de $ 30.000, con 2 pagas y 2 pendientes; sirve
-//   para probar las dos renovaciones (por ejemplo, un crédito nuevo de $ 110.000 o de $ 50.000).
+//   para probar las dos renovaciones (por ejemplo, un crédito nuevo de $ 110.000).
 // Cada cliente tiene un solo préstamo activo (el de Rosa que está saldado se paga antes de crear
 // el nuevo, porque crearPrestamo no permite dos activos). Las fechas se calculan a partir de hoy,
 // así la demo funciona cualquier día. Sin recargo por mora (mora_diaria_pct = 0), como los
