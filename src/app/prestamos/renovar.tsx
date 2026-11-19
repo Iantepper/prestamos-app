@@ -33,6 +33,7 @@ import {
 import { obtenerPerfilesRiesgo } from '@/db/riesgo';
 import type { Frecuencia } from '@/utils/cuotas';
 import {
+  formatearDiaMes,
   formatearFecha,
   formatearPesos,
   hoyISO,
@@ -46,9 +47,11 @@ import {
   calcularDeuda,
   calcularSuma,
   cuotasPendientes,
-  describirCuotas,
   ErrorRenovacion,
+  resumirCuotas,
+  textoCronograma,
   type CuotaActual,
+  type GrupoCuotas,
   type ResultadoDescuento,
   type ResultadoSuma,
 } from '@/utils/renovacion';
@@ -305,7 +308,11 @@ export default function RenovarScreen() {
               <ThemedText style={styles.titulo}>Descontar lo que debe</ThemedText>
               {descuento.valor ? (
                 <>
-                  <ResumenDescuento r={descuento.valor} />
+                  <ComoPaga
+                    plan={planDescuento(descuento.valor, frecuenciaNueva)}
+                    cuotaAntes={cuotaAntes}
+                  />
+                  <LineaTotal plan={planDescuento(descuento.valor, frecuenciaNueva)} />
                   <BotonGrande
                     texto="Elegir: descontar"
                     onPress={() => {
@@ -323,7 +330,11 @@ export default function RenovarScreen() {
               <ThemedText style={styles.titulo}>Sumar a las cuotas que quedan</ThemedText>
               {suma.valor ? (
                 <>
-                  <ResumenSuma r={suma.valor} />
+                  <ComoPaga
+                    plan={planSuma(suma.valor, pendientes, prestamo.frecuencia)}
+                    cuotaAntes={cuotaAntes}
+                  />
+                  <LineaTotal plan={planSuma(suma.valor, pendientes, prestamo.frecuencia)} />
                   <BotonGrande
                     texto="Elegir: sumar"
                     onPress={() => {
@@ -445,45 +456,76 @@ export default function RenovarScreen() {
   );
 }
 
-function ResumenDescuento({ r }: { r: ResultadoDescuento }) {
-  const primera = r.cuotas[0].monto;
-  const ultima = r.cuotas[r.cuotas.length - 1].monto;
+// Lo que va a pagar el cliente de ahora en adelante con cada modo.
+type Plan = {
+  proxima: { monto: number; fecha: string };
+  grupos: GrupoCuotas[];
+  frecuencia: Frecuencia;
+  entregado: number;
+  total: number;
+  ultimaFecha: string;
+};
+
+function planDescuento(r: ResultadoDescuento, frecuencia: Frecuencia): Plan {
+  return {
+    proxima: { monto: r.cuotas[0].monto, fecha: r.cuotas[0].fechaVencimiento },
+    grupos: resumirCuotas(r.cuotas),
+    frecuencia,
+    entregado: r.entregado,
+    total: r.total,
+    ultimaFecha: r.ultimaFecha,
+  };
+}
+
+// Con "sumar" sigue pagando las cuotas pendientes (las agrandadas y las que sobran del préstamo
+// anterior) y después las agregadas. De cada pendiente cuenta lo que falta pagar.
+function planSuma(r: ResultadoSuma, pendientes: CuotaActual[], frecuencia: Frecuencia): Plan {
+  const cambios = new Map(r.modificadas.map((q) => [q.id, q.monto]));
+  const desdeHoy = [
+    ...pendientes.map((q) => ({
+      monto: Math.round(((cambios.get(q.id) ?? q.monto) - q.montoPagado) * 100) / 100,
+      fecha: q.fechaVencimiento,
+    })),
+    ...r.agregadas.map((q) => ({ monto: q.monto, fecha: q.fechaVencimiento })),
+  ];
+  return {
+    proxima: desdeHoy[0],
+    grupos: resumirCuotas(desdeHoy),
+    frecuencia,
+    entregado: r.entregado,
+    total: r.totalDesdeHoy,
+    ultimaFecha: r.ultimaFecha,
+  };
+}
+
+function ComoPaga({ plan, cuotaAntes }: { plan: Plan; cuotaAntes?: number }) {
   return (
     <>
       <ThemedText style={styles.destacado}>
-        Le entregás hoy: <Monto valor={r.entregado} />
+        Próxima cuota: <Monto valor={plan.proxima.monto} /> (el{' '}
+        {formatearDiaMes(plan.proxima.fecha)})
       </ThemedText>
       <ThemedText style={styles.texto}>
-        {textoCuotas(r.cuotas.length)} de <Monto valor={primera} />
-        {ultima !== primera ? (
-          <>
-            {' '}
-            (la última de <Monto valor={ultima} />)
-          </>
-        ) : null}
+        Va a pagar: {textoCronograma(plan.grupos, plan.frecuencia)}
       </ThemedText>
-      <ThemedText style={styles.texto}>
-        Total a devolver: <Monto valor={r.total} />
+      {cuotaAntes !== undefined ? (
+        <ThemedText themeColor="textSecondary" style={styles.texto}>
+          Hoy paga {formatearPesos(cuotaAntes)} por cuota
+        </ThemedText>
+      ) : null}
+      <ThemedText style={styles.entregaLinea}>
+        Le entregás hoy: <Monto valor={plan.entregado} />
       </ThemedText>
-      <ThemedText style={styles.texto}>Última cuota: {formatearFecha(r.ultimaFecha)}</ThemedText>
     </>
   );
 }
 
-function ResumenSuma({ r }: { r: ResultadoSuma }) {
+function LineaTotal({ plan }: { plan: Plan }) {
   return (
-    <>
-      <ThemedText style={styles.destacado}>
-        Le entregás hoy: <Monto valor={r.entregado} />
-      </ThemedText>
-      <ThemedText style={styles.texto}>
-        Cómo quedan: {describirCuotas([...r.modificadas, ...r.agregadas])}
-      </ThemedText>
-      <ThemedText style={styles.texto}>
-        Total a devolver desde hoy: <Monto valor={r.totalDesdeHoy} />
-      </ThemedText>
-      <ThemedText style={styles.texto}>Última cuota: {formatearFecha(r.ultimaFecha)}</ThemedText>
-    </>
+    <ThemedText themeColor="textSecondary" style={styles.chico}>
+      Total a devolver: {formatearPesos(plan.total)} · última cuota{' '}
+      {formatearDiaMes(plan.ultimaFecha)}
+    </ThemedText>
   );
 }
 
@@ -557,6 +599,16 @@ const styles = StyleSheet.create({
     fontSize: 24,
     lineHeight: 32,
     fontWeight: '700',
+  },
+  entregaLinea: {
+    fontSize: 24,
+    lineHeight: 32,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  chico: {
+    fontSize: 18,
+    lineHeight: 26,
   },
   etiqueta: {
     fontWeight: '700',
