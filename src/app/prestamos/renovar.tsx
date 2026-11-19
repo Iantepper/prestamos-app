@@ -13,7 +13,6 @@ import { CampoTexto } from '@/components/campo-texto';
 import { useAviso, useConfirmar } from '@/components/dialogos';
 import { IndicadorRiesgo } from '@/components/indicador-riesgo';
 import { Monto } from '@/components/monto';
-import { OpcionGrande } from '@/components/opcion-grande';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import {
@@ -60,12 +59,6 @@ import type { NivelRiesgo } from '@/utils/riesgo';
 
 const COLOR_ERROR = Colors.danger;
 
-const FRECUENCIAS: { valor: Frecuencia; texto: string }[] = [
-  { valor: 'semanal', texto: 'Semanal' },
-  { valor: 'quincenal', texto: 'Quincenal' },
-  { valor: 'mensual', texto: 'Mensual' },
-];
-
 type Modo = 'descuento' | 'sumar';
 type Errores = { monto?: string; tasa?: string; cuotas?: string; fecha?: string };
 
@@ -97,7 +90,6 @@ export default function RenovarScreen() {
   const [monto, setMonto] = useState('');
   const [tasa, setTasa] = useState('');
   const [cantCuotas, setCantCuotas] = useState('');
-  const [frecuencia, setFrecuencia] = useState<Frecuencia | null>(null);
   const [fecha, setFecha] = useState(() => formatearFecha(hoyISO()));
   const [errores, setErrores] = useState<Errores>({});
   const [guardando, setGuardando] = useState(false);
@@ -141,7 +133,6 @@ export default function RenovarScreen() {
   }
 
   const deuda = calcularDeuda(cuotas);
-  const frecuenciaNueva = frecuencia ?? prestamo.frecuencia;
   const entregaNum = leerEntero(monto);
   const tasaNum = leerDecimal(tasa);
   const cuotasNum = leerEntero(cantCuotas);
@@ -164,7 +155,7 @@ export default function RenovarScreen() {
       ? intentar(() =>
           calcularDescuento(cuotas, {
             ...datos,
-            frecuencia: frecuenciaNueva,
+            frecuencia: prestamo.frecuencia,
             fechaInicio: fechaISO,
           })
         )
@@ -180,7 +171,7 @@ export default function RenovarScreen() {
   const cuotaAntes = pendientes[0].monto;
   const planElegido =
     modo === 'descuento'
-      ? descuento.valor && planDescuento(descuento.valor, frecuenciaNueva)
+      ? descuento.valor && planDescuento(descuento.valor, prestamo.frecuencia)
       : suma.valor && planSuma(suma.valor, pendientes, prestamo.frecuencia);
 
   const confirmarRenovacion = async () => {
@@ -198,9 +189,7 @@ export default function RenovarScreen() {
       vigente = await renovarPrestamo(
         db,
         prestamo.id,
-        modo === 'descuento'
-          ? { modo, ...datos, frecuencia: frecuenciaNueva, fechaInicio: fechaISO }
-          : { modo, ...datos },
+        modo === 'descuento' ? { modo, ...datos, fechaInicio: fechaISO } : { modo, ...datos },
         hoyISO()
       );
     } catch (e) {
@@ -269,22 +258,13 @@ export default function RenovarScreen() {
               placeholder="Ej: 4"
             />
 
+            <ThemedText themeColor="textSecondary">
+              Se sigue cobrando {TEXTO_FRECUENCIA[prestamo.frecuencia]}, como hasta ahora. Si sumás
+              a las cuotas que quedan, el interés se cobra solo sobre la plata que le entregás.
+            </ThemedText>
+
             <ThemedView type="backgroundElement" style={styles.tarjeta}>
               <ThemedText style={styles.destacado}>Solo si descontás lo que debe</ThemedText>
-              <ThemedText themeColor="textSecondary">
-                Si sumás a las cuotas que quedan, se sigue cobrando{' '}
-                {TEXTO_FRECUENCIA[prestamo.frecuencia]} y el interés se cobra solo sobre la plata
-                que le entregás ahora.
-              </ThemedText>
-              <ThemedText style={styles.etiqueta}>Cada cuánto paga</ThemedText>
-              {FRECUENCIAS.map((f) => (
-                <OpcionGrande
-                  key={f.valor}
-                  texto={f.texto}
-                  seleccionada={f.valor === frecuenciaNueva}
-                  onPress={() => setFrecuencia(f.valor)}
-                />
-              ))}
               <CampoTexto
                 etiqueta="Fecha de inicio (día/mes/año)"
                 value={fecha}
@@ -315,10 +295,10 @@ export default function RenovarScreen() {
               {descuento.valor ? (
                 <>
                   <ComoPaga
-                    plan={planDescuento(descuento.valor, frecuenciaNueva)}
+                    plan={planDescuento(descuento.valor, prestamo.frecuencia)}
                     cuotaAntes={cuotaAntes}
                   />
-                  <LineaTotal plan={planDescuento(descuento.valor, frecuenciaNueva)} />
+                  <LineaTotal plan={planDescuento(descuento.valor, prestamo.frecuencia)} />
                   <BotonGrande
                     texto="Elegir: descontar"
                     onPress={() => {
@@ -606,9 +586,6 @@ const styles = StyleSheet.create({
   chico: {
     fontSize: 18,
     lineHeight: 26,
-  },
-  etiqueta: {
-    fontWeight: '700',
   },
   texto: {
     fontSize: 20,

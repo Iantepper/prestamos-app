@@ -84,8 +84,7 @@ async function insertarPrestamo(
 }
 
 export type OpcionesRenovacion =
-  | (NuevoCredito & { modo: 'descuento'; frecuencia: Frecuencia; fechaInicio: string })
-  | (NuevoCredito & { modo: 'sumar' });
+  (NuevoCredito & { modo: 'descuento'; fechaInicio: string }) | (NuevoCredito & { modo: 'sumar' });
 
 // Cuotas de un préstamo en la forma que usan los cálculos de renovación.
 export async function cuotasParaRenovar(
@@ -115,7 +114,8 @@ export async function cuotasParaRenovar(
 
 // Renueva un préstamo activo, todo en una transacción (las reglas están en src/utils/renovacion.ts).
 //   descuento: el préstamo pasa a 'renovado', sus cuotas pendientes a 'cancelada', y se crea uno
-//              nuevo de X = E + deuda (con renueva_a y sus cuotas, sin mora).
+//              nuevo de X = E + deuda (con renueva_a y sus cuotas, sin mora), con la misma
+//              frecuencia.
 //   sumar:     se agrandan las cuotas pendientes, se agregan las que sobran y se actualizan
 //              cant_cuotas y monto (capital total: suma solo lo entregado, porque la deuda ya
 //              estaba en el monto del préstamo).
@@ -141,7 +141,7 @@ export async function renovarPrestamo(
     const cuotas = await cuotasParaRenovar(db, prestamoId);
 
     if (opciones.modo === 'descuento') {
-      const r = calcularDescuento(cuotas, opciones);
+      const r = calcularDescuento(cuotas, { ...opciones, frecuencia: prestamo.frecuencia });
       await db.runAsync("UPDATE prestamos SET estado = 'renovado' WHERE id = ?", [prestamoId]);
       await db.runAsync(
         "UPDATE cuotas SET estado = 'cancelada' WHERE prestamo_id = ? AND estado = 'pendiente'",
@@ -154,7 +154,7 @@ export async function renovarPrestamo(
           monto: r.creditoTotal,
           tasaPct: opciones.tasaPct,
           cantCuotas: opciones.cantCuotas,
-          frecuencia: opciones.frecuencia,
+          frecuencia: prestamo.frecuencia,
           fechaInicio: opciones.fechaInicio,
         },
         0,
