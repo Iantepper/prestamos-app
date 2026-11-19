@@ -193,7 +193,7 @@ export default function RenovarScreen() {
     if (!elegido || !fechaISO || guardando) return;
     const seguro = await confirmar({
       titulo: '¿Confirmás la renovación?',
-      mensaje: `Le entregás hoy ${formatearPesos(elegido.entregado)} a ${prestamo.cliente_nombre}.`,
+      mensaje: `Le vas a dar hoy ${formatearPesos(elegido.entregado)} a ${prestamo.cliente_nombre}.`,
       confirmar: 'Sí, renovar',
     });
     if (!seguro) return;
@@ -224,7 +224,7 @@ export default function RenovarScreen() {
     }
     avisar(
       'Préstamo renovado',
-      `Le entregaste ${formatearPesos(elegido.entregado)} a ${prestamo.cliente_nombre}.`
+      `Le diste ${formatearPesos(elegido.entregado)} a ${prestamo.cliente_nombre}.`
     );
   };
 
@@ -297,7 +297,7 @@ export default function RenovarScreen() {
 
             <ThemedText themeColor="textSecondary">
               Se sigue cobrando {TEXTO_FRECUENCIA[prestamo.frecuencia]}, como hasta ahora. Si sumás
-              a las cuotas que quedan, el interés se cobra solo sobre la plata que le entregás.
+              a las cuotas que quedan, el interés se cobra solo sobre la plata que le vas a dar.
             </ThemedText>
 
             <ThemedView type="backgroundElement" style={styles.tarjeta}>
@@ -413,8 +413,8 @@ export default function RenovarScreen() {
               <ThemedText style={styles.destacado}>Qué se hace</ThemedText>
               <ThemedText style={styles.texto}>
                 {modo === 'descuento'
-                  ? `Se cierra este préstamo y se hace uno nuevo de ${formatearPesos(planElegido?.creditoTotal ?? 0)}: los ${formatearPesos(deuda)} que debe más los ${formatearPesos(entregaNum)} que le entregás. El interés se cobra sobre todo ese monto.`
-                  : `Le entregás ${formatearPesos(entregaNum)}. El interés se cobra solo sobre esa plata, y las cuotas nuevas se suman a las que le quedan, de la más vieja a la más nueva.`}
+                  ? `Se cierra este préstamo y se hace uno nuevo de ${formatearPesos(planElegido?.creditoTotal ?? 0)}: los ${formatearPesos(deuda)} que debe más los ${formatearPesos(entregaNum)} que le vas a dar. El interés se cobra sobre todo ese monto.`
+                  : `Le vas a dar ${formatearPesos(entregaNum)}. El interés se cobra solo sobre esa plata, y las cuotas nuevas se suman a las que le quedan, de la más vieja a la más nueva.`}
               </ThemedText>
             </ThemedView>
 
@@ -524,11 +524,11 @@ function ComoPaga({ plan, cuotaAntes }: { plan: Plan; cuotaAntes?: number }) {
         </ThemedText>
       ) : null}
       <ThemedText style={styles.entregaLinea}>
-        Le entregás hoy: <Monto valor={plan.entregado} />
+        Le vas a dar hoy: <Monto valor={plan.entregado} />
       </ThemedText>
       <ThemedText themeColor="textSecondary" style={styles.chico}>
-        Crédito total: {formatearPesos(plan.creditoTotal)} (debe {formatearPesos(plan.deuda)} +
-        entrega {formatearPesos(plan.entregado)})
+        Crédito total: {formatearPesos(plan.creditoTotal)} (debe {formatearPesos(plan.deuda)} + le
+        das {formatearPesos(plan.entregado)})
       </ThemedText>
     </>
   );

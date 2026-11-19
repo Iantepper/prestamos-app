@@ -38,7 +38,7 @@ export class ErrorRenovacion extends Error {
   }
 }
 
-export const MENSAJE_ENTREGA = 'Tenés que entregar una plata mayor a cero';
+export const MENSAJE_ENTREGA = 'Tenés que dar una plata mayor a cero';
 
 // Cuotas pendientes, de la más vieja a la más nueva.
 export function cuotasPendientes(cuotas: CuotaActual[]): CuotaActual[] {
