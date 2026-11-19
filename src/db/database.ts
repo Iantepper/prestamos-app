@@ -80,4 +80,21 @@ export async function migrarDB(db: SQLiteDatabase) {
       PRAGMA user_version = 2;
     `);
   }
+
+  // Versión 3: cada cuota recuerda qué parte de su monto vino de cada renovación. Lo que no figura
+  // acá es del crédito original, así que las cuotas anteriores quedan enteras como originales.
+  if (version < 3) {
+    await db.execAsync(`
+      ALTER TABLE renovaciones ADD COLUMN tasa_interes REAL;  -- interés total en %; NULL si es vieja
+
+      CREATE TABLE IF NOT EXISTS cuota_adicionales (
+        cuota_id      INTEGER NOT NULL REFERENCES cuotas(id) ON DELETE CASCADE,
+        renovacion_id INTEGER NOT NULL REFERENCES renovaciones(id) ON DELETE CASCADE,
+        monto         REAL NOT NULL,
+        PRIMARY KEY (cuota_id, renovacion_id)
+      );
+
+      PRAGMA user_version = 3;
+    `);
+  }
 }

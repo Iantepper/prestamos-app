@@ -104,6 +104,12 @@ export async function eliminarCliente(db: SQLiteDatabase, clienteId: number): Pr
     const { activos } = await contarPrestamosDeCliente(db, clienteId);
     if (activos > 0) return;
     await db.runAsync(
+      `DELETE FROM cuota_adicionales WHERE cuota_id IN (
+         SELECT q.id FROM cuotas q JOIN prestamos p ON p.id = q.prestamo_id WHERE p.cliente_id = ?
+       )`,
+      [clienteId]
+    );
+    await db.runAsync(
       `DELETE FROM pagos WHERE cuota_id IN (
          SELECT q.id FROM cuotas q JOIN prestamos p ON p.id = q.prestamo_id WHERE p.cliente_id = ?
        )`,

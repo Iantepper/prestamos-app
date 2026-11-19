@@ -7,7 +7,9 @@ import {
   calcularDescuento,
   calcularSuma,
   ErrorRenovacion,
+  type Adicional,
   type CuotaActual,
+  type FilaRenovacion,
   type NuevoCredito,
 } from '@/utils/renovacion';
 
@@ -112,13 +114,57 @@ export async function cuotasParaRenovar(
   }));
 }
 
+// Partes de cada cuota que vinieron de una renovación: id de la cuota -> sus adicionales, de la
+// renovación más vieja a la más nueva. Las cuotas sin adicionales no aparecen.
+export async function obtenerAdicionales(db: SQLiteDatabase): Promise<Map<number, Adicional[]>> {
+  const filas = await db.getAllAsync<{
+    cuota_id: number;
+    renovacion_id: number;
+    monto: number;
+    fecha: string;
+    entregado: number;
+  }>(
+    `SELECT a.cuota_id, a.renovacion_id, a.monto, r.fecha, r.entregado
+       FROM cuota_adicionales a
+       JOIN renovaciones r ON r.id = a.renovacion_id
+       JOIN cuotas q ON q.id = a.cuota_id
+      ORDER BY a.renovacion_id, q.numero`
+  );
+  const porCuota = new Map<number, Adicional[]>();
+  for (const f of filas) {
+    const lista = porCuota.get(f.cuota_id) ?? [];
+    lista.push({
+      renovacionId: f.renovacion_id,
+      monto: f.monto,
+      fecha: f.fecha,
+      entregado: f.entregado,
+    });
+    porCuota.set(f.cuota_id, lista);
+  }
+  return porCuota;
+}
+
+// Renovaciones de un préstamo, de la más vieja a la más nueva.
+export async function listarRenovaciones(
+  db: SQLiteDatabase,
+  prestamoId: number
+): Promise<FilaRenovacion[]> {
+  return db.getAllAsync<FilaRenovacion>(
+    `SELECT id, fecha, modo, deuda_anterior, monto_nuevo, entregado, tasa_interes
+       FROM renovaciones
+      WHERE prestamo_id = ?
+      ORDER BY id`,
+    [prestamoId]
+  );
+}
+
 // Renueva un préstamo activo, todo en una transacción (las reglas están en src/utils/renovacion.ts).
-//   descuento: el préstamo pasa a 'renovado', sus cuotas pendientes a 'cancelada', y se crea uno
+//   descuento: (sin uso en la pantalla) el préstamo pasa a 'renovado', sus cuotas pendientes a 'cancelada', y se crea uno
 //              nuevo de X = E + deuda (con renueva_a y sus cuotas, sin mora), con la misma
 //              frecuencia.
 //   sumar:     se agrandan las cuotas pendientes, se agregan las que sobran y se actualizan
 //              cant_cuotas y monto (capital total: suma solo lo entregado, porque la deuda ya
-//              estaba en el monto del préstamo).
+//              estaba en el monto del préstamo). Cada parte agregada queda en cuota_adicionales.
 // En los dos casos se anota la renovación en la tabla renovaciones (monto_nuevo = X y
 // entregado = E), con el préstamo que queda vigente. Devuelve el id de ese préstamo. Si los
 // datos no sirven, lanza ErrorRenovacion.
@@ -160,23 +206,38 @@ export async function renovarPrestamo(
         0,
         prestamoId
       );
-      await anotarRenovacion(db, vigente, fecha, 'descuento', r.deuda, r.creditoTotal, r.entregado);
+      await anotarRenovacion(db, vigente, fecha, 'descuento', r, opciones.tasaPct);
     } else {
       const r = calcularSuma(cuotas, prestamo.frecuencia, opciones);
+      const renovacionId = await anotarRenovacion(
+        db,
+        prestamoId,
+        fecha,
+        'sumar',
+        r,
+        opciones.tasaPct
+      );
+      const anotarAdicional = (cuotaId: number, monto: number) =>
+        db.runAsync(
+          'INSERT INTO cuota_adicionales (cuota_id, renovacion_id, monto) VALUES (?, ?, ?)',
+          [cuotaId, renovacionId, monto]
+        );
       for (const q of r.modificadas) {
         await db.runAsync('UPDATE cuotas SET monto = ? WHERE id = ?', [q.monto, q.id]);
+        await anotarAdicional(q.id, q.adicional);
       }
+      // Las cuotas agregadas no tienen parte original: todo su monto es adicional.
       for (const q of r.agregadas) {
-        await db.runAsync(
+        const nueva = await db.runAsync(
           'INSERT INTO cuotas (prestamo_id, numero, fecha_vencimiento, monto) VALUES (?, ?, ?, ?)',
           [prestamoId, q.numero, q.fechaVencimiento, q.monto]
         );
+        await anotarAdicional(nueva.lastInsertRowId, q.monto);
       }
       await db.runAsync(
         'UPDATE prestamos SET cant_cuotas = cant_cuotas + ?, monto = ROUND(monto + ?, 2) WHERE id = ?',
         [r.agregadas.length, r.entregado, prestamoId]
       );
-      await anotarRenovacion(db, prestamoId, fecha, 'sumar', r.deuda, r.creditoTotal, r.entregado);
     }
   });
   return vigente;
@@ -187,15 +248,16 @@ async function anotarRenovacion(
   prestamoId: number,
   fecha: string,
   modo: 'descuento' | 'sumar',
-  deudaAnterior: number,
-  montoNuevo: number,
-  entregado: number
-) {
-  await db.runAsync(
-    `INSERT INTO renovaciones (prestamo_id, fecha, modo, deuda_anterior, monto_nuevo, entregado)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [prestamoId, fecha, modo, deudaAnterior, montoNuevo, entregado]
+  r: { deuda: number; creditoTotal: number; entregado: number },
+  tasaPct: number
+): Promise<number> {
+  const fila = await db.runAsync(
+    `INSERT INTO renovaciones
+       (prestamo_id, fecha, modo, deuda_anterior, monto_nuevo, entregado, tasa_interes)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [prestamoId, fecha, modo, r.deuda, r.creditoTotal, r.entregado, tasaPct]
   );
+  return fila.lastInsertRowId;
 }
 
 export type PrestamoListado = {

@@ -1,19 +1,20 @@
 // src/utils/renovacion.ts
-// Cálculo de las dos formas de renovar un préstamo, a partir de la plata que se entrega en mano (E).
+// Cálculo de la renovación de un préstamo, a partir de la plata que se da en mano (E).
 // Funciones puras: no dependen de la base ni de React.
 //
 // Deuda: suma de (monto − monto_pagado) de las cuotas pendientes, sin mora.
 // E tiene que ser mayor que 0. El crédito total se calcula: X = E + deuda.
 //
-// Modo "Descontar lo que debe": crédito nuevo de monto X, con interés sobre X completo (incluye lo
-//   que debía). El préstamo actual se cierra y sus cuotas pendientes se cancelan.
-//
-// Modo "Sumar a las cuotas que quedan": el interés se cobra solo sobre E. Con E, el interés y la
-//   cantidad de cuotas se calculan cuotas nuevas (calcularCuotas); la cuota nueva i se suma a la i-ésima cuota pendiente, de la más vieja a la más nueva. Si las nuevas
+// Modo "Sumar a las cuotas que quedan" (el único que ofrece la pantalla): el interés se cobra solo
+//   sobre E. Con E, el interés y la cantidad de cuotas se calculan cuotas nuevas (calcularCuotas); la
+//   cuota nueva i se suma a la i-ésima cuota pendiente, de la más vieja a la más nueva. Si las nuevas
 //   son más que las pendientes, las que sobran se agregan al final con la frecuencia del préstamo;
-//   si son menos, solo se agrandan las primeras.
+//   si son menos, solo se agrandan las primeras. Cada parte agregada se recuerda aparte.
+//
+// Modo "Descontar lo que debe" (sin uso en la pantalla, queda como la mora): crédito nuevo de monto
+//   X, con interés sobre X completo. El préstamo actual se cierra y sus cuotas pendientes se cancelan.
 import { calcularCuotas, type CuotaCalculada, type Frecuencia } from '@/utils/cuotas';
-import { formatearPesos } from '@/utils/formato';
+import { formatearDiaMes, formatearPesos } from '@/utils/formato';
 
 export type CuotaActual = {
   id: number;
@@ -100,6 +101,7 @@ export type CuotaModificada = {
   fechaVencimiento: string;
   montoAnterior: number;
   monto: number; // monto nuevo de la cuota (anterior + cuota nueva)
+  adicional: number; // lo que se le sumó
   montoPagado: number;
 };
 
@@ -149,6 +151,7 @@ export function calcularSuma(
     fechaVencimiento: q.fechaVencimiento,
     montoAnterior: q.monto,
     monto: redondear(q.monto + nuevas[i].monto),
+    adicional: nuevas[i].monto,
     montoPagado: q.montoPagado,
   }));
   const agregadas: CuotaAgregada[] = nuevas.slice(pendientes.length).map((q, j) => ({
@@ -248,6 +251,135 @@ export function resumirFaltante(
         : `Faltan pagar ${cronograma} · ${formatearPesos(calcularDeuda(cuotas))} en total`,
     vencidas: pendientes.filter((q) => q.fechaVencimiento < hoy).length,
   };
+}
+
+// Una renovación tal como está en la tabla renovaciones.
+export type FilaRenovacion = {
+  id: number;
+  fecha: string; // 'YYYY-MM-DD'
+  modo: 'descuento' | 'sumar';
+  deuda_anterior: number;
+  monto_nuevo: number;
+  entregado: number;
+  tasa_interes: number | null; // null en las renovaciones anteriores a la versión 3 de la base
+};
+
+// Monto del crédito original: al sumar, el monto del préstamo creció con lo que se fue dando.
+export function montoOriginal(montoPrestamo: number, renovaciones: FilaRenovacion[]): number {
+  return redondear(
+    renovaciones.reduce((m, r) => (r.modo === 'sumar' ? m - r.entregado : m), montoPrestamo)
+  );
+}
+
+// Parte de una cuota que vino de una renovación. `nueva` marca la renovación que se está por hacer.
+export type Adicional = {
+  renovacionId: number;
+  monto: number;
+  fecha: string; // 'YYYY-MM-DD'
+  entregado: number; // la plata que se dio en esa renovación
+  nueva?: boolean;
+};
+
+export type OrigenCuota = 'original' | Omit<Adicional, 'monto'>;
+export type ComponenteCuota = { origen: OrigenCuota; monto: number };
+
+// De qué se compone una cuota. Lo original es el monto menos sus adicionales. Si la cuota se editó
+// a un monto menor que sus adicionales, se muestran solo hasta completar el monto.
+export function componentesDeCuota(
+  monto: number,
+  adicionales: Adicional[] = []
+): ComponenteCuota[] {
+  const sumados = adicionales.reduce((suma, a) => suma + a.monto, 0);
+  const original = redondear(monto - sumados);
+  const componentes: ComponenteCuota[] =
+    original > 0 ? [{ origen: 'original', monto: original }] : [];
+  let resto = redondear(monto - Math.max(0, original));
+  for (const { monto: parte, ...origen } of adicionales) {
+    const usado = Math.min(parte, resto);
+    if (usado > 0) componentes.push({ origen, monto: usado });
+    resto = redondear(resto - usado);
+  }
+  return componentes;
+}
+
+function nombreOrigen(origen: OrigenCuota): string {
+  if (origen === 'original') return 'el crédito original';
+  return origen.nueva ? 'el crédito nuevo' : `la renovación del ${formatearDiaMes(origen.fecha)}`;
+}
+
+function claveOrigen(origen: OrigenCuota): string {
+  return origen === 'original' ? 'original' : `r${origen.renovacionId}`;
+}
+
+// "$ 25.000 original + $ 17.500 renovación del 18/11" (detalle) o
+// "$ 25.000 del crédito original + $ 17.500 del crédito nuevo de $ 70.000" (cobro).
+export function textoDesglose(
+  componentes: ComponenteCuota[],
+  estilo: 'detalle' | 'cobro' = 'detalle'
+): string {
+  const adicionales = componentes.filter((c) => c.origen !== 'original').length;
+  return componentes
+    .map(({ origen, monto }) => {
+      const pesos = formatearPesos(monto);
+      if (origen === 'original') {
+        return estilo === 'cobro' ? `${pesos} del crédito original` : `${pesos} original`;
+      }
+      const dia = formatearDiaMes(origen.fecha);
+      if (estilo === 'detalle') {
+        return origen.nueva ? `${pesos} crédito nuevo` : `${pesos} renovación del ${dia}`;
+      }
+      const cuanto = formatearPesos(origen.entregado);
+      return adicionales === 1 || origen.nueva
+        ? `${pesos} del crédito nuevo de ${cuanto}`
+        : `${pesos} del crédito del ${dia} de ${cuanto}`;
+    })
+    .join(' + ');
+}
+
+export type CuotaConComponentes = {
+  numero: number;
+  fechaVencimiento: string;
+  monto: number;
+  componentes: ComponenteCuota[];
+};
+
+// Cuándo cambia el monto de las cuotas pendientes y por qué. Una frase por cada cambio:
+// "Hasta la cuota 2 (18/01): $ 42.500; después baja a $ 17.500 porque termina el crédito original".
+export function explicarCronograma(cuotas: CuotaConComponentes[]): string[] {
+  if (cuotas.length === 0) return [];
+  const frases: string[] = [];
+  cuotas.slice(1).forEach((siguiente, i) => {
+    const actual = cuotas[i];
+    if (Math.abs(actual.monto - siguiente.monto) < 0.01) return;
+    const claves = (q: CuotaConComponentes) => q.componentes.map((c) => claveOrigen(c.origen));
+    const faltantes = (a: CuotaConComponentes, b: CuotaConComponentes) =>
+      a.componentes
+        .filter((c) => !claves(b).includes(claveOrigen(c.origen)))
+        .map((c) => nombreOrigen(c.origen));
+    const terminan = faltantes(actual, siguiente);
+    const empiezan = faltantes(siguiente, actual);
+    const motivos = [
+      terminan.length > 0
+        ? `${terminan.length > 1 ? 'terminan' : 'termina'} ${terminan.join(' y ')}`
+        : '',
+      empiezan.length > 0
+        ? `${empiezan.length > 1 ? 'empiezan' : 'empieza'} ${empiezan.join(' y ')}`
+        : '',
+    ].filter(Boolean);
+    frases.push(
+      `Hasta la cuota ${actual.numero} (${formatearDiaMes(actual.fechaVencimiento)}): ` +
+        `${formatearPesos(actual.monto)}; después ${siguiente.monto < actual.monto ? 'baja' : 'sube'} a ` +
+        formatearPesos(siguiente.monto) +
+        (motivos.length > 0 ? ` porque ${motivos.join(' y ')}` : '')
+    );
+  });
+  if (frases.length > 0) return frases;
+  const monto = formatearPesos(cuotas[0].monto);
+  return [
+    cuotas.length === 1
+      ? `Queda 1 cuota de ${monto}`
+      : `Las ${cuotas.length} cuotas son de ${monto}: el monto no cambia`,
+  ];
 }
 
 function redondear(valor: number): number {

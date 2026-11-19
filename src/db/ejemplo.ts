@@ -122,6 +122,7 @@ export async function cargarDatosDeEjemplo(db: SQLiteDatabase): Promise<void> {
 export async function borrarTodosLosDatos(db: SQLiteDatabase): Promise<void> {
   await db.withTransactionAsync(async () => {
     await db.execAsync(`
+      DELETE FROM cuota_adicionales;
       DELETE FROM renovaciones;
       DELETE FROM pagos;
       DELETE FROM cuotas;
