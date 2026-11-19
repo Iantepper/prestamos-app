@@ -3,7 +3,7 @@
 //   2. Comparar los dos modos ("Descontar lo que debe" y "Sumar a las cuotas que quedan").
 //   3. Revisar el modo elegido y confirmar.
 // Las reglas de cálculo están en src/utils/renovacion.ts y el guardado en renovarPrestamo.
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -80,6 +80,7 @@ export default function RenovarScreen() {
   const { id, desde } = useLocalSearchParams<{ id: string; desde?: string }>();
   const prestamoId = Number(id);
   const scrollRef = useRef<ScrollView>(null);
+  const navigation = useNavigation();
 
   const [prestamo, setPrestamo] = useState<PrestamoDetalle | null>(null);
   const [cuotas, setCuotas] = useState<CuotaActual[]>([]);
@@ -112,6 +113,15 @@ export default function RenovarScreen() {
       activo = false;
     };
   }, [db, prestamoId]);
+
+  // Si se entró desde la Agenda, al salir de esta pantalla (por terminar o por volver atrás) se
+  // vuelve a la Agenda, que se refresca sola al recibir el foco.
+  useEffect(() => {
+    if (desde !== 'agenda') return;
+    return navigation.addListener('beforeRemove', () => {
+      setTimeout(() => router.navigate('/'), 0);
+    });
+  }, [navigation, desde]);
 
   const irAPaso = (nuevo: 1 | 2 | 3) => {
     setPaso(nuevo);
@@ -205,8 +215,9 @@ export default function RenovarScreen() {
       return;
     }
     reprogramarRecordatorios(db);
-    // Se vuelve al préstamo que queda vigente: el mismo si se sumó, el nuevo si se descontó.
-    if (modo === 'sumar' && desde === 'detalle') {
+    // Se vuelve a la Agenda si se vino de ahí. Si no, al préstamo que queda vigente: el mismo si se
+    // sumó, el nuevo si se descontó.
+    if (desde === 'agenda' || (modo === 'sumar' && desde === 'detalle')) {
       router.back();
     } else {
       router.replace({ pathname: '/prestamos/[id]', params: { id: vigente } });

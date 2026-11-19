@@ -229,6 +229,19 @@ export default function AgendaScreen() {
                               ) : null}
                             </View>
                             <BotonGrande texto="Cobrar" onPress={() => setClienteACobrar(grupo)} />
+                            <BotonGrande
+                              texto="Renovar"
+                              variante="secundario"
+                              onPress={() =>
+                                router.push(
+                                  {
+                                    pathname: '/prestamos/renovar',
+                                    params: { id: cliente.prestamo_id, desde: 'agenda' },
+                                  },
+                                  { withAnchor: true }
+                                )
+                              }
+                            />
                           </View>
                         </ThemedView>
                       );
