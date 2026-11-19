@@ -5,6 +5,7 @@ App móvil para un prestamista informal: funciona como una agenda de cobros. Reg
 Está pensada para una persona mayor sin conocimientos técnicos:
 - **Letra y botones:** letra grande y botones altos, con pocas opciones por pantalla.
 - **Confirmaciones:** cuadros grandes y claros antes de cada acción importante.
+- **Montos:** los campos de plata ponen solos los puntos de miles mientras se escribe (1.500.000).
 
 Trabajo práctico de Seminario (UTN). Todo funciona en el celular, sin cuentas y sin servidor: los datos se guardan en una base SQLite local.
 
@@ -15,27 +16,29 @@ Trabajo práctico de Seminario (UTN). Todo funciona en el celular, sin cuentas y
   - **Cada tarjeta muestra:**
     - "Cobrar ahora" (lo atrasado más lo de hoy), la cantidad de cuotas y hace cuánto venció la más vieja;
     - si tiene cuotas en los próximos días, cuánto y cuándo ("Después: $Y el DD/MM");
-    - la dirección.
-  - **Botones:** "Cómo llegar" (abre Google Maps), "Llamar" (abre el marcador del teléfono) y "Cobrar".
+    - la dirección y el teléfono.
+  - **Botones:** "Cómo llegar" (abre Google Maps), "Llamar" (abre el marcador del teléfono), "Cobrar" y "Renovar".
 - **Cobro por cliente** (desde la Agenda): "¿Cuánto te pagó?" viene cargado con lo que hay que cobrar ahora. Antes de confirmar muestra a qué cuotas se aplica, por ejemplo "Cuota 3: completa" y "Cuota 4: $5.000 de $30.000".
 - **Clientes:**
   - alta con nombre, teléfono, dirección y notas, con aviso si ya existe uno con el mismo nombre y dirección;
   - buscador por nombre (sin distinguir mayúsculas ni acentos);
   - perfil de riesgo de cada uno, siempre con texto además del color;
   - para los que tienen préstamo activo: "Debe en total" y, si hay algo vencido, "Vencido" en rojo;
-  - botones "Llamar", "Editar" y "Eliminar". No se puede eliminar un cliente con préstamo activo; si solo tiene préstamos terminados, se borra también su historial, con doble confirmación.
+  - al tocar los datos de un cliente se abre su préstamo activo o, si no tiene, el alta de préstamo con ese cliente ya elegido;
+  - botones "Llamar", "Editar" y "Eliminar", y "Ver préstamos" si tiene préstamos anteriores. No se puede eliminar un cliente con préstamo activo; si solo tiene préstamos terminados, se borra también su historial, con doble confirmación.
 - **Préstamos:**
   - alta eligiendo el cliente (con buscador), con vista previa de las cuotas;
   - listas de préstamos activos y saldados (los renovados aparecen con los saldados).
 - **Detalle del préstamo:**
   - datos, lo cobrado, lo que falta y la lista de cuotas;
+  - debajo de "Falta cobrar", una línea con lo que queda de cada cuota: "Faltan pagar 2 cuotas de $25.000 · $50.000 en total" y, si corresponde, "(N vencidas)" en rojo;
   - cobrar una cuota (también pagos parciales) y editar la fecha y el monto de una cuota pendiente;
   - "Renovar préstamo" y, si hubo una renovación, la línea "Renovado el DD/MM";
   - eliminar el préstamo si todavía no tiene pagos y no participó de una renovación.
-- **Renovación** (desde el detalle o desde el alta), en tres pasos:
-  1. **Datos:** lo que debe hoy y los datos del nuevo crédito.
-  2. **Comparación:** una tarjeta por modo, con la próxima cuota, lo que va a pagar ("2 cuotas de $45.000, después 2 cuotas de $15.000, una por semana"), lo que paga hoy y lo que se le entrega. El total a devolver y la última cuota van al final, en chico.
-  3. **Revisión:** arriba, el recuadro "Cómo va a pagar". Después, el préstamo actual, qué se hace, cómo queda cada cuota y el perfil de riesgo del cliente.
+- **Renovación**, en tres pasos:
+  1. **Datos:** una ficha del préstamo actual, con "Debe hoy" destacado, y la pregunta "¿Cuánta plata le vas a dar en mano?", junto con el interés y la cantidad de cuotas.
+  2. **Comparación:** una tarjeta por modo, con la próxima cuota, lo que va a pagar ("2 cuotas de $45.000, después 2 cuotas de $15.000, una por semana"), "Hasta ahora pagaba", "Le vas a dar hoy" y el crédito total. El total a devolver y la última cuota van al final, en chico.
+  3. **Revisión:** arriba, el recuadro "Cómo va a pagar". Después, el préstamo actual, qué se hace, cómo queda cada cuota y el perfil de riesgo del cliente. El total a devolver va al final, en chico.
 - **Resumen:** total prestado, total cobrado, lo que falta cobrar, cuotas atrasadas y cantidad de préstamos activos y saldados. Los totales se muestran en pesos enteros.
 - **Ajustes** (desde Resumen): borrar todos los datos, con doble confirmación, y cargar los datos de ejemplo (solo en modo desarrollo).
 - **Recordatorios:** una notificación a las 9:00 de cada día de los próximos 14 que tenga cobros ("Hoy tenés N cobros por $X").
@@ -58,7 +61,7 @@ Requisitos: [Node.js](https://nodejs.org) (versión LTS) y la app **Expo Go** in
 
 3. Abrir Expo Go en el celular y escanear el código QR que aparece en la terminal. En iPhone, el QR se escanea con la cámara.
 
-Para revisar el código antes de entregar cambios:
+Para revisar el código antes de subir cambios:
 
 ```bash
 npx tsc --noEmit
@@ -84,7 +87,7 @@ Con la app corriendo en modo desarrollo, ir a **Resumen → Ajustes → Cargar d
 | Jorge Medina | Con atrasos | Una cuota pagada tarde y otra vencida hace 3 días |
 | Carlos Ruiz | Riesgo | Dos cuotas vencidas sin cobrar |
 | Ana Gómez | Nuevo | Un préstamo que empieza hoy |
-| Laura Pérez | Cumplidor | $100.000 al 20 % en 4 cuotas de $30.000, con 2 pagas. Sirve para probar la renovación, por ejemplo con un crédito nuevo de $110.000 |
+| Laura Pérez | Cumplidor | $100.000 al 20 % en 4 cuotas de $30.000, con 2 pagas. Sirve para probar la renovación, por ejemplo dándole $50.000 en mano |
 
 ## Tecnologías
 
@@ -108,13 +111,14 @@ src/
       index.tsx         Alta de préstamo y lista de activos / saldados
       [id].tsx          Detalle del préstamo con sus cuotas
       renovar.tsx       Renovación del préstamo en tres pasos
+      cliente.tsx       Todos los préstamos de un cliente
     resumen/            Pestaña Resumen (Stack)
       index.tsx         Totales
       ajustes.tsx       Borrado de datos y datos de ejemplo
-  components/           Componentes reutilizables: BotonGrande, CampoTexto, OpcionGrande,
-                        dialogos (cuadros de confirmación y aviso), CuadroCobro,
-                        CuadroCobroCliente, CuadroEditarCuota, CuadroEditarCliente,
-                        IndicadorRiesgo...
+  components/           Componentes reutilizables: BotonGrande, CampoTexto, CampoMonto,
+                        OpcionGrande, TarjetaPrestamo, dialogos (cuadros de confirmación y
+                        aviso), CuadroCobro, CuadroCobroCliente, CuadroEditarCuota,
+                        CuadroEditarCliente, IndicadorRiesgo...
   db/                   Base de datos SQLite: tablas y migraciones (database.ts) y consultas
                         por tema
   utils/                Lógica sin pantalla: cuotas, renovación, reparto de pagos, agenda,
@@ -134,18 +138,23 @@ src/
 Un cliente no puede tener dos préstamos activos a la vez. En el alta, los que ya tienen uno aparecen con la etiqueta "Ya tiene un préstamo" y la app ofrece renovarlo.
 
 ### Renovación (`src/utils/renovacion.ts`)
-En los dos modos, el "Monto del nuevo crédito" (X) es el crédito total: **se entrega X − deuda** y **X tiene que ser mayor que la deuda**. La deuda es lo que falta pagar de las cuotas pendientes. La diferencia entre los modos es sobre qué se cobra el interés y cómo quedan las cuotas.
+Se escribe cuánta plata se le va a dar en mano (**E**), que tiene que ser mayor que cero. La **deuda** es lo que falta pagar de las cuotas pendientes, y el **crédito total** se calcula: **E + deuda**. La renovación mantiene la frecuencia del préstamo.
 
-- **Descontar lo que debe:** el interés se cobra sobre todo X. Se hace un préstamo nuevo de X, el anterior queda como "renovado" y sus cuotas pendientes se cancelan.
-- **Sumar a las cuotas que quedan:** el interés se cobra solo sobre lo entregado. Con ese monto se calculan cuotas nuevas, y cada una se suma a una cuota pendiente, de la más vieja a la más nueva. Si las nuevas son más que las pendientes, las que sobran se agregan al final con la misma frecuencia; si son menos, solo crecen las primeras. Una cuota con un pago parcial conserva lo pagado.
+- **Descontar lo que debe:** el interés se cobra sobre todo el crédito. Se hace un préstamo nuevo por ese total, el anterior queda como "renovado" y sus cuotas pendientes se cancelan. Se elige la fecha de inicio del préstamo nuevo.
+- **Sumar a las cuotas que quedan:** el interés se cobra solo sobre E. Con ese monto se calculan cuotas nuevas, y cada una se suma a una cuota pendiente, de la más vieja a la más nueva. Si las nuevas son más que las pendientes, las que sobran se agregan al final con la misma frecuencia; si son menos, solo crecen las primeras. Una cuota con un pago parcial conserva lo pagado.
 
-Ejemplo: le quedan 2 cuotas de $30.000 (debe $60.000) y se renueva con un crédito de $110.000 al 20 % en 4 cuotas. En los dos modos se le entregan $50.000.
+Ejemplo: le quedan 2 cuotas de $30.000 (debe $60.000) y se le dan $50.000 en mano, al 20 % en 4 cuotas. El crédito total es de $110.000.
 
 | | Descontar | Sumar |
 |---|---|---|
 | Interés sobre | $110.000 | $50.000 |
 | Cuotas que quedan | $33.000, $33.000, $33.000, $33.000 | $45.000, $45.000, $15.000, $15.000 |
 | Total a pagar desde hoy | $132.000 | $120.000 |
+
+Se puede renovar desde:
+- **Préstamos:** con "Renovar préstamo" en el detalle, o al elegir en el alta a un cliente que ya tiene un préstamo activo.
+- **Clientes:** al tocar al cliente se abre su préstamo, con el mismo botón.
+- **Agenda:** con el botón "Renovar" de cada tarjeta. Al terminar o al volver atrás, se regresa a la Agenda.
 
 ### Cobros
 - **Por cliente (desde la Agenda):** lo que paga se reparte entre sus cuotas pendientes, de la más vieja a la más nueva. Se pueden adelantar cuotas, sin pasar de lo que debe en total.
