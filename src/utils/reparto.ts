@@ -6,6 +6,7 @@
 export type CuotaPendiente = {
   id: number;
   numero: number;
+  monto: number; // monto completo de la cuota
   falta: number; // lo que falta de la cuota (monto - monto_pagado)
   recargo: number; // recargo por mora que falta cobrar (0 si no hay mora)
 };

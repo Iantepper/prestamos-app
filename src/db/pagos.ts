@@ -73,6 +73,7 @@ export async function listarCuotasPendientesCliente(
   return filas.map((q) => ({
     id: q.id,
     numero: q.numero,
+    monto: q.monto,
     falta: Math.round((q.monto - q.monto_pagado) * 100) / 100,
     recargo: calcularMoraPendiente(
       { monto: q.monto, fechaVencimiento: q.fecha_vencimiento, moraPagada: q.mora_pagada },

@@ -25,12 +25,14 @@ import {
 } from '@/constants/theme';
 import { listarCobrosPendientes, type CobroPendiente } from '@/db/agenda';
 import { registrarPagoCliente } from '@/db/pagos';
+import { obtenerAdicionales } from '@/db/prestamos';
 import { contarClientesYPrestamos } from '@/db/resumen';
 import { agruparPorCliente, type CobroCliente, type Seccion } from '@/utils/agenda';
 import { formatearDiaMes, hoyISO, sumarDias } from '@/utils/formato';
 import { llamar } from '@/utils/llamar';
 import { calcularMoraPendiente } from '@/utils/mora';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
+import { desgloseCobro, type Adicional } from '@/utils/renovacion';
 
 const COLOR_VENCIDA = Colors.danger;
 
@@ -48,6 +50,7 @@ const SECCIONES: { clave: Seccion; titulo: string; color: string | null }[] = [
 export default function AgendaScreen() {
   const db = useSQLiteContext();
   const [filas, setFilas] = useState<CobroPendiente[]>([]);
+  const [adicionales, setAdicionales] = useState<Map<number, Adicional[]>>(new Map());
   // null mientras carga, para no mostrar la guía un instante antes de los datos.
   const [cantidades, setCantidades] = useState<{ clientes: number; prestamos: number } | null>(
     null
@@ -65,11 +68,13 @@ export default function AgendaScreen() {
       Promise.all([
         listarCobrosPendientes(db, sumarDias(fechaHoy, 7)),
         contarClientesYPrestamos(db),
-      ]).then(([resultado, totales]) => {
+        obtenerAdicionales(db),
+      ]).then(([resultado, totales, partes]) => {
         if (!activo) return;
         setHoy(fechaHoy);
         setFilas(resultado);
         setCantidades(totales);
+        setAdicionales(partes);
       });
       return () => {
         activo = false;
@@ -170,6 +175,14 @@ export default function AgendaScreen() {
                     </ThemedText>
                     {clientes.map((grupo) => {
                       const cliente = grupo.cuotas[0];
+                      // Sin repetir: varias cuotas suelen tener el mismo desglose.
+                      const desgloses = [
+                        ...new Set(
+                          grupo.cuotas.flatMap(
+                            (q) => desgloseCobro(q.monto, adicionales.get(q.cuota_id)) ?? []
+                          )
+                        ),
+                      ];
                       return (
                         <ThemedView
                           key={grupo.clienteId}
@@ -206,6 +219,11 @@ export default function AgendaScreen() {
                               {textoCuotas(grupo.cuotas.length)}
                             </ThemedText>
                           ) : null}
+                          {desgloses.map((texto) => (
+                            <ThemedText key={texto} themeColor="textSecondary" style={styles.chico}>
+                              {texto}
+                            </ThemedText>
+                          ))}
                           <ThemedText style={styles.texto}>{cliente.direccion}</ThemedText>
                           {cliente.telefono ? (
                             <ThemedText style={styles.texto}>Tel: {cliente.telefono}</ThemedText>
@@ -323,6 +341,10 @@ const styles = StyleSheet.create({
   texto: {
     fontSize: 20,
     lineHeight: 28,
+  },
+  chico: {
+    fontSize: 18,
+    lineHeight: 26,
   },
   destacado: {
     fontSize: 24,

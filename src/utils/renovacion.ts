@@ -341,6 +341,14 @@ export function textoDesglose(
     .join(' + ');
 }
 
+// "Cuota $ 42.500: $ 25.000 del crédito original + $ 17.500 del crédito nuevo de $ 70.000".
+// null si la cuota tiene una sola parte.
+export function desgloseCobro(monto: number, adicionales: Adicional[] = []): string | null {
+  const componentes = componentesDeCuota(monto, adicionales);
+  if (componentes.length < 2) return null;
+  return `Cuota ${formatearPesos(monto)}: ${textoDesglose(componentes, 'cobro')}`;
+}
+
 export type CuotaConComponentes = {
   numero: number;
   fechaVencimiento: string;

@@ -34,6 +34,7 @@ import { calcularMoraPendiente } from '@/utils/mora';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
 import {
   componentesDeCuota,
+  desgloseCobro,
   montoOriginal,
   resumirFaltante,
   textoDesglose,
@@ -399,6 +400,7 @@ export default function DetallePrestamoScreen() {
           montoPagado={cuotaACobrar.monto_pagado}
           diasAtraso={moraDe(cuotaACobrar).diasAtraso}
           recargo={moraDe(cuotaACobrar).recargo}
+          desglose={desgloseCobro(cuotaACobrar.monto, adicionales.get(cuotaACobrar.id))}
           onConfirmar={(pago) => cobrar(cuotaACobrar, pago)}
           onCancelar={() => setCuotaACobrar(null)}
         />

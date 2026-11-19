@@ -11,7 +11,9 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { EstiloTarjeta, Spacing } from '@/constants/theme';
 import { listarCuotasPendientesCliente } from '@/db/pagos';
+import { obtenerAdicionales } from '@/db/prestamos';
 import { formatearPesos, hoyISO } from '@/utils/formato';
+import { desgloseCobro, type Adicional } from '@/utils/renovacion';
 import { repartirPago, saldoTotal, type CuotaPendiente } from '@/utils/reparto';
 
 type Props = {
@@ -34,13 +36,19 @@ export function CuadroCobroCliente({
   const db = useSQLiteContext();
   const preguntar = useConfirmar();
   const [cuotas, setCuotas] = useState<CuotaPendiente[] | null>(null);
+  const [adicionales, setAdicionales] = useState<Map<number, Adicional[]>>(new Map());
   const pagado = useMonto({ inicial: montoInicial });
   const [error, setError] = useState<string>();
 
   useEffect(() => {
     let activo = true;
-    listarCuotasPendientesCliente(db, clienteId, hoyISO()).then((filas) => {
-      if (activo) setCuotas(filas);
+    Promise.all([
+      listarCuotasPendientesCliente(db, clienteId, hoyISO()),
+      obtenerAdicionales(db),
+    ]).then(([filas, partes]) => {
+      if (!activo) return;
+      setCuotas(filas);
+      setAdicionales(partes);
     });
     return () => {
       activo = false;
@@ -91,18 +99,29 @@ export function CuadroCobroCliente({
       {aplicaciones.length > 0 ? (
         <View style={styles.reparto}>
           <ThemedText style={styles.subtitulo}>Se aplica a:</ThemedText>
-          {aplicaciones.map((a) => (
-            <ThemedText key={a.cuotaId} style={styles.texto}>
-              Cuota {a.numero}:{' '}
-              {a.completa ? (
-                'completa'
-              ) : (
-                <>
-                  <Monto valor={a.monto + a.mora} /> de <Monto valor={a.adeudado} />
-                </>
-              )}
-            </ThemedText>
-          ))}
+          {aplicaciones.map((a) => {
+            const cuota = cuotas?.find((q) => q.id === a.cuotaId);
+            const desglose = cuota ? desgloseCobro(cuota.monto, adicionales.get(cuota.id)) : null;
+            return (
+              <View key={a.cuotaId}>
+                <ThemedText style={styles.texto}>
+                  Cuota {a.numero}:{' '}
+                  {a.completa ? (
+                    'completa'
+                  ) : (
+                    <>
+                      <Monto valor={a.monto + a.mora} /> de <Monto valor={a.adeudado} />
+                    </>
+                  )}
+                </ThemedText>
+                {desglose ? (
+                  <ThemedText themeColor="textSecondary" style={styles.chico}>
+                    {desglose}
+                  </ThemedText>
+                ) : null}
+              </View>
+            );
+          })}
         </View>
       ) : null}
 
@@ -125,6 +144,10 @@ const styles = StyleSheet.create({
   texto: {
     fontSize: 20,
     lineHeight: 28,
+  },
+  chico: {
+    fontSize: 18,
+    lineHeight: 26,
   },
   total: {
     fontSize: 24,

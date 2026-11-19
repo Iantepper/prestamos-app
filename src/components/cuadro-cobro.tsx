@@ -18,6 +18,7 @@ type Props = {
   montoPagado: number;
   diasAtraso: number;
   recargo: number; // recargo por mora que falta cobrar
+  desglose?: string | null; // de qué se compone la cuota, si tiene más de una parte
   // `monto` es la parte que va a la cuota y `mora` la que va al recargo.
   onConfirmar: (pago: { monto: number; mora: number }) => void;
   onCancelar: () => void;
@@ -31,6 +32,7 @@ export function CuadroCobro({
   montoPagado,
   diasAtraso,
   recargo,
+  desglose,
   onConfirmar,
   onCancelar,
 }: Props) {
@@ -68,6 +70,11 @@ export function CuadroCobro({
         <ThemedText style={styles.texto}>
           Monto de la cuota: <Monto valor={montoCuota} />
         </ThemedText>
+        {desglose ? (
+          <ThemedText themeColor="textSecondary" style={styles.chico}>
+            {desglose}
+          </ThemedText>
+        ) : null}
         {montoPagado > 0 ? (
           <ThemedText style={styles.texto}>
             Ya pagó: <Monto valor={montoPagado} />
@@ -104,6 +111,10 @@ const styles = StyleSheet.create({
   texto: {
     fontSize: 20,
     lineHeight: 28,
+  },
+  chico: {
+    fontSize: 18,
+    lineHeight: 26,
   },
   total: {
     fontSize: 24,
