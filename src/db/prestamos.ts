@@ -115,12 +115,12 @@ export async function cuotasParaRenovar(
 
 // Renueva un préstamo activo, todo en una transacción (las reglas están en src/utils/renovacion.ts).
 //   descuento: el préstamo pasa a 'renovado', sus cuotas pendientes a 'cancelada', y se crea uno
-//              nuevo de X (con renueva_a y sus cuotas, sin mora).
+//              nuevo de X = E + deuda (con renueva_a y sus cuotas, sin mora).
 //   sumar:     se agrandan las cuotas pendientes, se agregan las que sobran y se actualizan
 //              cant_cuotas y monto (capital total: suma solo lo entregado, porque la deuda ya
 //              estaba en el monto del préstamo).
 // En los dos casos se anota la renovación en la tabla renovaciones (monto_nuevo = X y
-// entregado = X − deuda), con el préstamo que queda vigente. Devuelve el id de ese préstamo. Si los
+// entregado = E), con el préstamo que queda vigente. Devuelve el id de ese préstamo. Si los
 // datos no sirven, lanza ErrorRenovacion.
 export async function renovarPrestamo(
   db: SQLiteDatabase,
@@ -151,7 +151,7 @@ export async function renovarPrestamo(
         db,
         prestamo.cliente_id,
         {
-          monto: opciones.montoNuevo,
+          monto: r.creditoTotal,
           tasaPct: opciones.tasaPct,
           cantCuotas: opciones.cantCuotas,
           frecuencia: opciones.frecuencia,
@@ -160,15 +160,7 @@ export async function renovarPrestamo(
         0,
         prestamoId
       );
-      await anotarRenovacion(
-        db,
-        vigente,
-        fecha,
-        'descuento',
-        r.deuda,
-        opciones.montoNuevo,
-        r.entregado
-      );
+      await anotarRenovacion(db, vigente, fecha, 'descuento', r.deuda, r.creditoTotal, r.entregado);
     } else {
       const r = calcularSuma(cuotas, prestamo.frecuencia, opciones);
       for (const q of r.modificadas) {
@@ -184,15 +176,7 @@ export async function renovarPrestamo(
         'UPDATE prestamos SET cant_cuotas = cant_cuotas + ?, monto = ROUND(monto + ?, 2) WHERE id = ?',
         [r.agregadas.length, r.entregado, prestamoId]
       );
-      await anotarRenovacion(
-        db,
-        prestamoId,
-        fecha,
-        'sumar',
-        r.deuda,
-        opciones.montoNuevo,
-        r.entregado
-      );
+      await anotarRenovacion(db, prestamoId, fecha, 'sumar', r.deuda, r.creditoTotal, r.entregado);
     }
   });
   return vigente;

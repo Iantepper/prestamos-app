@@ -1,16 +1,15 @@
 // src/utils/renovacion.ts
-// Cálculo de las dos formas de renovar un préstamo, con el mismo "Monto del nuevo crédito" (X).
+// Cálculo de las dos formas de renovar un préstamo, a partir de la plata que se entrega en mano (E).
 // Funciones puras: no dependen de la base ni de React.
 //
 // Deuda: suma de (monto − monto_pagado) de las cuotas pendientes, sin mora.
-// En los dos modos X es el crédito total: tiene que ser mayor que la deuda y se entrega X − deuda.
+// E tiene que ser mayor que 0. El crédito total se calcula: X = E + deuda.
 //
 // Modo "Descontar lo que debe": crédito nuevo de monto X, con interés sobre X completo (incluye lo
 //   que debía). El préstamo actual se cierra y sus cuotas pendientes se cancelan.
 //
-// Modo "Sumar a las cuotas que quedan": el interés se cobra solo sobre lo que se entrega. Con
-//   X − deuda, el interés y la cantidad de cuotas se calculan cuotas nuevas (calcularCuotas); la
-//   cuota nueva i se suma a la i-ésima cuota pendiente, de la más vieja a la más nueva. Si las nuevas
+// Modo "Sumar a las cuotas que quedan": el interés se cobra solo sobre E. Con E, el interés y la
+//   cantidad de cuotas se calculan cuotas nuevas (calcularCuotas); la cuota nueva i se suma a la i-ésima cuota pendiente, de la más vieja a la más nueva. Si las nuevas
 //   son más que las pendientes, las que sobran se agregan al final con la frecuencia del préstamo;
 //   si son menos, solo se agrandan las primeras.
 import { calcularCuotas, type CuotaCalculada, type Frecuencia } from '@/utils/cuotas';
@@ -26,7 +25,7 @@ export type CuotaActual = {
 };
 
 export type NuevoCredito = {
-  montoNuevo: number; // X
+  entrega: number; // E: la plata que se le da en mano
   tasaPct: number; // interés total en %
   cantCuotas: number;
 };
@@ -38,6 +37,8 @@ export class ErrorRenovacion extends Error {
     this.name = 'ErrorRenovacion';
   }
 }
+
+export const MENSAJE_ENTREGA = 'Tenés que entregar una plata mayor a cero';
 
 // Cuotas pendientes, de la más vieja a la más nueva.
 export function cuotasPendientes(cuotas: CuotaActual[]): CuotaActual[] {
@@ -53,26 +54,17 @@ export function calcularDeuda(cuotas: CuotaActual[]): number {
 }
 
 function validar(datos: NuevoCredito) {
-  if (!(datos.montoNuevo > 0))
-    throw new ErrorRenovacion('El monto del nuevo crédito tiene que ser mayor a 0');
+  if (!(datos.entrega > 0)) throw new ErrorRenovacion(MENSAJE_ENTREGA);
   if (!(datos.tasaPct >= 0)) throw new ErrorRenovacion('El interés no puede ser negativo');
   if (!(Number.isInteger(datos.cantCuotas) && datos.cantCuotas >= 1)) {
     throw new ErrorRenovacion('La cantidad de cuotas tiene que ser 1 o más');
   }
 }
 
-export function mensajeCreditoChico(deuda: number): string {
-  return `El crédito nuevo tiene que ser mayor que lo que debe hoy: ${formatearPesos(deuda)}`;
-}
-
-// X es el crédito total: tiene que cubrir lo que debe y dejar algo para entregar.
-function validarMayorQueDeuda(montoNuevo: number, deuda: number) {
-  if (montoNuevo <= deuda) throw new ErrorRenovacion(mensajeCreditoChico(deuda));
-}
-
 export type ResultadoDescuento = {
   deuda: number;
-  entregado: number; // X − deuda
+  entregado: number; // E
+  creditoTotal: number; // X = E + deuda
   cuotas: CuotaCalculada[]; // las del préstamo nuevo
   total: number; // total a devolver del préstamo nuevo
   ultimaFecha: string;
@@ -84,9 +76,9 @@ export function calcularDescuento(
 ): ResultadoDescuento {
   validar(datos);
   const deuda = calcularDeuda(cuotasActuales);
-  validarMayorQueDeuda(datos.montoNuevo, deuda);
+  const creditoTotal = redondear(datos.entrega + deuda);
   const cuotas = calcularCuotas({
-    monto: datos.montoNuevo,
+    monto: creditoTotal,
     tasaPct: datos.tasaPct,
     cantCuotas: datos.cantCuotas,
     frecuencia: datos.frecuencia,
@@ -94,7 +86,8 @@ export function calcularDescuento(
   });
   return {
     deuda,
-    entregado: redondear(datos.montoNuevo - deuda),
+    entregado: redondear(datos.entrega),
+    creditoTotal,
     cuotas,
     total: redondear(cuotas.reduce((suma, q) => suma + q.monto, 0)),
     ultimaFecha: cuotas[cuotas.length - 1].fechaVencimiento,
@@ -114,7 +107,8 @@ export type CuotaAgregada = { numero: number; fechaVencimiento: string; monto: n
 
 export type ResultadoSuma = {
   deuda: number;
-  entregado: number; // X − deuda
+  entregado: number; // E
+  creditoTotal: number; // X = E + deuda
   modificadas: CuotaModificada[];
   agregadas: CuotaAgregada[];
   totalNuevo: number; // lo que se suma a devolver: lo entregado más su interés
@@ -131,8 +125,7 @@ export function calcularSuma(
   const pendientes = cuotasPendientes(cuotasActuales);
   if (pendientes.length === 0) throw new ErrorRenovacion('El préstamo no tiene cuotas pendientes');
   const deuda = calcularDeuda(cuotasActuales);
-  validarMayorQueDeuda(datos.montoNuevo, deuda);
-  const entregado = redondear(datos.montoNuevo - deuda);
+  const entregado = redondear(datos.entrega);
   const vigentes = cuotasActuales.filter((q) => q.estado !== 'cancelada');
   const ultimaActual = vigentes.reduce(
     (max, q) => (q.fechaVencimiento > max ? q.fechaVencimiento : max),
@@ -168,6 +161,7 @@ export function calcularSuma(
   return {
     deuda,
     entregado,
+    creditoTotal: redondear(entregado + deuda),
     modificadas,
     agregadas,
     totalNuevo,

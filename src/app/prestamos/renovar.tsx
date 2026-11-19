@@ -1,5 +1,5 @@
 // Renovación de un préstamo en tres pasos:
-//   1. Datos del nuevo crédito.
+//   1. Cuánta plata se entrega en mano y datos del crédito.
 //   2. Comparar los dos modos ("Descontar lo que debe" y "Sumar a las cuotas que quedan").
 //   3. Revisar el modo elegido y confirmar.
 // Las reglas de cálculo están en src/utils/renovacion.ts y el guardado en renovarPrestamo.
@@ -48,7 +48,7 @@ import {
   calcularSuma,
   cuotasPendientes,
   ErrorRenovacion,
-  mensajeCreditoChico,
+  MENSAJE_ENTREGA,
   resumirCuotas,
   textoCronograma,
   type CuotaActual,
@@ -142,16 +142,15 @@ export default function RenovarScreen() {
 
   const deuda = calcularDeuda(cuotas);
   const frecuenciaNueva = frecuencia ?? prestamo.frecuencia;
-  const montoNum = leerEntero(monto);
+  const entregaNum = leerEntero(monto);
   const tasaNum = leerDecimal(tasa);
   const cuotasNum = leerEntero(cantCuotas);
   const fechaISO = leerFecha(fecha);
-  const datos = { montoNuevo: montoNum, tasaPct: tasaNum, cantCuotas: cuotasNum };
+  const datos = { entrega: entregaNum, tasaPct: tasaNum, cantCuotas: cuotasNum };
 
   const validar = (): boolean => {
     const nuevos: Errores = {};
-    if (!(montoNum > 0)) nuevos.monto = 'Escribí un monto mayor a 0';
-    else if (montoNum <= deuda) nuevos.monto = mensajeCreditoChico(deuda);
+    if (!(entregaNum > 0)) nuevos.monto = MENSAJE_ENTREGA;
     if (!(tasaNum >= 0)) nuevos.tasa = 'Escribí el interés (puede ser 0)';
     if (!(cuotasNum > 0)) nuevos.cuotas = 'Escribí una cantidad de cuotas mayor a 0';
     if (!fechaISO) nuevos.fecha = 'Escribí la fecha como día/mes/año. Ej: 05/11/2026';
@@ -245,12 +244,12 @@ export default function RenovarScreen() {
             </ThemedView>
 
             <CampoTexto
-              etiqueta="Monto del nuevo crédito ($)"
+              etiqueta="¿Cuánta plata le vas a dar en mano? ($)"
               value={monto}
               onChangeText={setMonto}
               error={errores.monto}
               keyboardType="number-pad"
-              placeholder="Ej: 110000"
+              placeholder="Ej: 50000"
             />
             <CampoTexto
               etiqueta="Interés total (%)"
@@ -308,7 +307,7 @@ export default function RenovarScreen() {
         {paso === 2 ? (
           <>
             <ThemedText style={styles.destacado}>
-              Con un crédito nuevo de <Monto valor={montoNum} />, elegí cómo renovar:
+              Le das <Monto valor={entregaNum} /> en mano. Elegí cómo renovar:
             </ThemedText>
 
             <ThemedView type="backgroundElement" style={styles.tarjeta}>
@@ -397,8 +396,8 @@ export default function RenovarScreen() {
               <ThemedText style={styles.destacado}>Qué se hace</ThemedText>
               <ThemedText style={styles.texto}>
                 {modo === 'descuento'
-                  ? `Se cierra este préstamo y se hace uno nuevo de ${formatearPesos(montoNum)}, con el interés sobre todo ese monto. De ahí se descuentan los ${formatearPesos(deuda)} que debe.`
-                  : `El crédito nuevo es de ${formatearPesos(montoNum)}: ${formatearPesos(deuda)} cubren lo que debe y le entregás ${formatearPesos(planElegido?.entregado ?? 0)}. El interés se cobra solo sobre la plata que le entregás ahora, y esas cuotas se suman a las que le quedan, de la más vieja a la más nueva.`}
+                  ? `Se cierra este préstamo y se hace uno nuevo de ${formatearPesos(planElegido?.creditoTotal ?? 0)}: los ${formatearPesos(deuda)} que debe más los ${formatearPesos(entregaNum)} que le entregás. El interés se cobra sobre todo ese monto.`
+                  : `Le entregás ${formatearPesos(entregaNum)}. El interés se cobra solo sobre esa plata, y las cuotas nuevas se suman a las que le quedan, de la más vieja a la más nueva.`}
               </ThemedText>
             </ThemedView>
 
@@ -450,6 +449,8 @@ type Plan = {
   grupos: GrupoCuotas[];
   frecuencia: Frecuencia;
   entregado: number;
+  creditoTotal: number;
+  deuda: number;
   total: number;
   ultimaFecha: string;
 };
@@ -460,6 +461,8 @@ function planDescuento(r: ResultadoDescuento, frecuencia: Frecuencia): Plan {
     grupos: resumirCuotas(r.cuotas),
     frecuencia,
     entregado: r.entregado,
+    creditoTotal: r.creditoTotal,
+    deuda: r.deuda,
     total: r.total,
     ultimaFecha: r.ultimaFecha,
   };
@@ -481,6 +484,8 @@ function planSuma(r: ResultadoSuma, pendientes: CuotaActual[], frecuencia: Frecu
     grupos: resumirCuotas(desdeHoy),
     frecuencia,
     entregado: r.entregado,
+    creditoTotal: r.creditoTotal,
+    deuda: r.deuda,
     total: r.totalDesdeHoy,
     ultimaFecha: r.ultimaFecha,
   };
@@ -503,6 +508,10 @@ function ComoPaga({ plan, cuotaAntes }: { plan: Plan; cuotaAntes?: number }) {
       ) : null}
       <ThemedText style={styles.entregaLinea}>
         Le entregás hoy: <Monto valor={plan.entregado} />
+      </ThemedText>
+      <ThemedText themeColor="textSecondary" style={styles.chico}>
+        Crédito total: {formatearPesos(plan.creditoTotal)} (debe {formatearPesos(plan.deuda)} +
+        entrega {formatearPesos(plan.entregado)})
       </ThemedText>
     </>
   );
