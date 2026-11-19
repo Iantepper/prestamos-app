@@ -48,6 +48,7 @@ import {
   calcularSuma,
   cuotasPendientes,
   ErrorRenovacion,
+  mensajeCreditoChico,
   resumirCuotas,
   textoCronograma,
   type CuotaActual,
@@ -150,6 +151,7 @@ export default function RenovarScreen() {
   const validar = (): boolean => {
     const nuevos: Errores = {};
     if (!(montoNum > 0)) nuevos.monto = 'Escribí un monto mayor a 0';
+    else if (montoNum <= deuda) nuevos.monto = mensajeCreditoChico(deuda);
     if (!(tasaNum >= 0)) nuevos.tasa = 'Escribí el interés (puede ser 0)';
     if (!(cuotasNum > 0)) nuevos.cuotas = 'Escribí una cantidad de cuotas mayor a 0';
     if (!fechaISO) nuevos.fecha = 'Escribí la fecha como día/mes/año. Ej: 05/11/2026';
@@ -272,7 +274,8 @@ export default function RenovarScreen() {
               <ThemedText style={styles.destacado}>Solo si descontás lo que debe</ThemedText>
               <ThemedText themeColor="textSecondary">
                 Si sumás a las cuotas que quedan, se sigue cobrando{' '}
-                {TEXTO_FRECUENCIA[prestamo.frecuencia]}.
+                {TEXTO_FRECUENCIA[prestamo.frecuencia]} y el interés se cobra solo sobre la plata
+                que le entregás ahora.
               </ThemedText>
               <ThemedText style={styles.etiqueta}>Cada cuánto paga</ThemedText>
               {FRECUENCIAS.map((f) => (
@@ -395,7 +398,7 @@ export default function RenovarScreen() {
               <ThemedText style={styles.texto}>
                 {modo === 'descuento'
                   ? `Se cierra este préstamo y se hace uno nuevo de ${formatearPesos(montoNum)}, con el interés sobre todo ese monto. De ahí se descuentan los ${formatearPesos(deuda)} que debe.`
-                  : `Se le prestan ${formatearPesos(montoNum)} más y las cuotas nuevas se suman a las que le quedan, de la más vieja a la más nueva.`}
+                  : `El crédito nuevo es de ${formatearPesos(montoNum)}: ${formatearPesos(deuda)} cubren lo que debe y le entregás ${formatearPesos(planElegido?.entregado ?? 0)}. El interés se cobra solo sobre la plata que le entregás ahora, y esas cuotas se suman a las que le quedan, de la más vieja a la más nueva.`}
               </ThemedText>
             </ThemedView>
 
