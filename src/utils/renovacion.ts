@@ -382,6 +382,78 @@ export function explicarCronograma(cuotas: CuotaConComponentes[]): string[] {
   ];
 }
 
+export type CuotaPrevista = CuotaConComponentes & {
+  clave: string;
+  montoPagado: number;
+  pendiente: boolean;
+  nota: string; // " (pagada)", " (agrandada)", " (nueva)" o vacío
+  desglose: string | null; // de qué se compone, si tiene más de una parte
+};
+
+// Cómo quedan las cuotas si se confirma la renovación, sin guardar nada. `lista` trae todas por
+// número; `pendientes`, las que falta pagar, de la más vieja a la más nueva.
+export function preverCuotas(
+  cuotas: CuotaActual[],
+  r: ResultadoSuma,
+  adicionales: Map<number, Adicional[]>,
+  hoy: string // 'YYYY-MM-DD'
+): { lista: CuotaPrevista[]; pendientes: CuotaPrevista[] } {
+  const parteNueva = (monto: number): Adicional => ({
+    renovacionId: 0,
+    monto,
+    fecha: hoy,
+    entregado: r.entregado,
+    nueva: true,
+  });
+  const modificadas = new Map(r.modificadas.map((q) => [q.id, q]));
+  const lista: CuotaPrevista[] = [
+    ...cuotas
+      .filter((q) => q.estado !== 'cancelada')
+      .sort((a, b) => a.numero - b.numero)
+      .map((q) => {
+        const cambio = modificadas.get(q.id);
+        const guardados = adicionales.get(q.id) ?? [];
+        const monto = cambio?.monto ?? q.monto;
+        const componentes = componentesDeCuota(
+          monto,
+          cambio ? [...guardados, parteNueva(cambio.adicional)] : guardados
+        );
+        const desglose = cambio
+          ? `${formatearPesos(cambio.montoAnterior)} del crédito anterior + ` +
+            `${formatearPesos(cambio.adicional)} del crédito nuevo`
+          : componentes.length > 1
+            ? textoDesglose(componentes)
+            : null;
+        return {
+          clave: `c${q.id}`,
+          numero: q.numero,
+          fechaVencimiento: q.fechaVencimiento,
+          monto,
+          montoPagado: q.montoPagado,
+          pendiente: q.estado === 'pendiente',
+          nota: q.estado === 'pagada' ? ' (pagada)' : cambio ? ' (agrandada)' : '',
+          componentes,
+          desglose,
+        };
+      }),
+    ...r.agregadas.map((q) => ({
+      clave: `n${q.numero}`,
+      numero: q.numero,
+      fechaVencimiento: q.fechaVencimiento,
+      monto: q.monto,
+      montoPagado: 0,
+      pendiente: true,
+      nota: ' (nueva)',
+      componentes: componentesDeCuota(q.monto, [parteNueva(q.monto)]),
+      desglose: null,
+    })),
+  ];
+  const pendientes = lista
+    .filter((q) => q.pendiente)
+    .sort((a, b) => a.fechaVencimiento.localeCompare(b.fechaVencimiento) || a.numero - b.numero);
+  return { lista, pendientes };
+}
+
 function redondear(valor: number): number {
   return Math.round(valor * 100) / 100;
 }

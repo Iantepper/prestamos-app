@@ -1,7 +1,7 @@
-// Renovación de un préstamo en tres pasos:
-//   1. Cuánta plata se entrega en mano y datos del crédito.
-//   2. Comparar los dos modos ("Descontar lo que debe" y "Sumar a las cuotas que quedan").
-//   3. Revisar el modo elegido y confirmar.
+// Renovación de un préstamo en dos pasos:
+//   1. Cuánta plata se le da en mano, interés y cantidad de cuotas.
+//   2. Revisar cómo va a pagar y confirmar.
+// El préstamo sigue siendo uno solo: lo nuevo se suma a las cuotas que quedan.
 // Las reglas de cálculo están en src/utils/renovacion.ts y el guardado en renovarPrestamo.
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -26,12 +26,13 @@ import {
 } from '@/constants/theme';
 import {
   cuotasParaRenovar,
+  listarRenovaciones,
+  obtenerAdicionales,
   obtenerPrestamo,
   renovarPrestamo,
   type PrestamoDetalle,
 } from '@/db/prestamos';
 import { obtenerPerfilesRiesgo } from '@/db/riesgo';
-import type { Frecuencia } from '@/utils/cuotas';
 import {
   formatearDiaMes,
   formatearFecha,
@@ -39,29 +40,28 @@ import {
   hoyISO,
   leerDecimal,
   leerEntero,
-  leerFecha,
 } from '@/utils/formato';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
 import {
-  calcularDescuento,
   calcularDeuda,
   calcularSuma,
   cuotasPendientes,
   ErrorRenovacion,
+  explicarCronograma,
   MENSAJE_ENTREGA,
+  montoOriginal,
+  preverCuotas,
   resumirCuotas,
   textoCronograma,
+  type Adicional,
   type CuotaActual,
-  type GrupoCuotas,
-  type ResultadoDescuento,
-  type ResultadoSuma,
+  type FilaRenovacion,
 } from '@/utils/renovacion';
 import type { NivelRiesgo } from '@/utils/riesgo';
 
 const COLOR_ERROR = Colors.danger;
 
-type Modo = 'descuento' | 'sumar';
-type Errores = { monto?: string; tasa?: string; cuotas?: string; fecha?: string };
+type Errores = { monto?: string; tasa?: string; cuotas?: string };
 
 // Intenta un cálculo y, si los datos no sirven, devuelve el mensaje de error para mostrar.
 function intentar<T>(calculo: () => T): { valor: T | null; error: string | null } {
@@ -84,15 +84,15 @@ export default function RenovarScreen() {
 
   const [prestamo, setPrestamo] = useState<PrestamoDetalle | null>(null);
   const [cuotas, setCuotas] = useState<CuotaActual[]>([]);
+  const [adicionales, setAdicionales] = useState<Map<number, Adicional[]>>(new Map());
+  const [renovaciones, setRenovaciones] = useState<FilaRenovacion[]>([]);
   const [perfil, setPerfil] = useState<NivelRiesgo>('nuevo');
   const [cargando, setCargando] = useState(true);
 
-  const [paso, setPaso] = useState<1 | 2 | 3>(1);
-  const [modo, setModo] = useState<Modo>('descuento');
+  const [paso, setPaso] = useState<1 | 2>(1);
   const entrega = useMonto({ enteros: true });
   const [tasa, setTasa] = useState('');
   const [cantCuotas, setCantCuotas] = useState('');
-  const [fecha, setFecha] = useState(() => formatearFecha(hoyISO()));
   const [errores, setErrores] = useState<Errores>({});
   const [guardando, setGuardando] = useState(false);
 
@@ -102,10 +102,14 @@ export default function RenovarScreen() {
       obtenerPrestamo(db, prestamoId),
       cuotasParaRenovar(db, prestamoId),
       obtenerPerfilesRiesgo(db, hoyISO()),
-    ]).then(([filaPrestamo, filasCuotas, perfiles]) => {
+      obtenerAdicionales(db),
+      listarRenovaciones(db, prestamoId),
+    ]).then(([filaPrestamo, filasCuotas, perfiles, partes, filasRenovaciones]) => {
       if (!activo) return;
       setPrestamo(filaPrestamo);
       setCuotas(filasCuotas);
+      setAdicionales(partes);
+      setRenovaciones(filasRenovaciones);
       if (filaPrestamo) setPerfil(perfiles.get(filaPrestamo.cliente_id) ?? 'nuevo');
       setCargando(false);
     });
@@ -123,7 +127,7 @@ export default function RenovarScreen() {
     });
   }, [navigation, desde]);
 
-  const irAPaso = (nuevo: 1 | 2 | 3) => {
+  const irAPaso = (nuevo: 1 | 2) => {
     setPaso(nuevo);
     scrollRef.current?.scrollTo({ y: 0, animated: false });
   };
@@ -147,7 +151,6 @@ export default function RenovarScreen() {
   const entregaNum = entrega.numero;
   const tasaNum = leerDecimal(tasa);
   const cuotasNum = leerEntero(cantCuotas);
-  const fechaISO = leerFecha(fecha);
   const datos = { entrega: entregaNum, tasaPct: tasaNum, cantCuotas: cuotasNum };
 
   const validar = (): boolean => {
@@ -155,57 +158,37 @@ export default function RenovarScreen() {
     if (!(entregaNum > 0)) nuevos.monto = MENSAJE_ENTREGA;
     if (!(tasaNum >= 0)) nuevos.tasa = 'Escribí el interés (puede ser 0)';
     if (!(cuotasNum > 0)) nuevos.cuotas = 'Escribí una cantidad de cuotas mayor a 0';
-    if (!fechaISO) nuevos.fecha = 'Escribí la fecha como día/mes/año. Ej: 05/11/2026';
     setErrores(nuevos);
     return Object.keys(nuevos).length === 0;
   };
 
-  // Los dos cálculos, con los mismos datos. Solo se usan desde el paso 2, con los datos ya validados.
-  const descuento =
-    paso >= 2 && fechaISO
-      ? intentar(() =>
-          calcularDescuento(cuotas, {
-            ...datos,
-            frecuencia: prestamo.frecuencia,
-            fechaInicio: fechaISO,
-          })
-        )
-      : { valor: null, error: null };
+  // Solo se calcula en la revisión, con los datos ya validados.
   const suma =
-    paso >= 2
+    paso === 2
       ? intentar(() => calcularSuma(cuotas, prestamo.frecuencia, datos))
       : { valor: null, error: null };
+  const prevision = suma.valor ? preverCuotas(cuotas, suma.valor, adicionales, hoyISO()) : null;
+  const proximaNueva = prevision?.pendientes[0];
 
   const vigentes = cuotas.filter((q) => q.estado !== 'cancelada');
   const pagas = vigentes.filter((q) => q.estado === 'pagada').length;
-  const cobrado = vigentes.reduce((s, q) => s + q.montoPagado, 0);
   const cuotaAntes = pendientes[0].monto;
   const proxima = pendientes[0];
-  const faltaProxima = Math.round((proxima.monto - proxima.montoPagado) * 100) / 100;
+  const faltaProxima = redondear(proxima.monto - proxima.montoPagado);
   const gruposHoy = resumirCuotas(pendientes);
-  const planElegido =
-    modo === 'descuento'
-      ? descuento.valor && planDescuento(descuento.valor, prestamo.frecuencia)
-      : suma.valor && planSuma(suma.valor, pendientes, prestamo.frecuencia);
 
   const confirmarRenovacion = async () => {
-    const elegido = modo === 'descuento' ? descuento.valor : suma.valor;
-    if (!elegido || !fechaISO || guardando) return;
+    if (!suma.valor || guardando) return;
+    const entregado = suma.valor.entregado;
     const seguro = await confirmar({
       titulo: '¿Confirmás la renovación?',
-      mensaje: `Le vas a dar hoy ${formatearPesos(elegido.entregado)} a ${prestamo.cliente_nombre}.`,
+      mensaje: `Le vas a dar hoy ${formatearPesos(entregado)} a ${prestamo.cliente_nombre}. Las cuotas nuevas se suman a las que le quedan.`,
       confirmar: 'Sí, renovar',
     });
     if (!seguro) return;
     setGuardando(true);
-    let vigente: number;
     try {
-      vigente = await renovarPrestamo(
-        db,
-        prestamo.id,
-        modo === 'descuento' ? { modo, ...datos, fechaInicio: fechaISO } : { modo, ...datos },
-        hoyISO()
-      );
+      await renovarPrestamo(db, prestamo.id, { modo: 'sumar', ...datos }, hoyISO());
     } catch (e) {
       setGuardando(false);
       await avisar(
@@ -215,16 +198,15 @@ export default function RenovarScreen() {
       return;
     }
     reprogramarRecordatorios(db);
-    // Se vuelve a la Agenda si se vino de ahí. Si no, al préstamo que queda vigente: el mismo si se
-    // sumó, el nuevo si se descontó.
-    if (desde === 'agenda' || (modo === 'sumar' && desde === 'detalle')) {
+    // Se vuelve a donde se estaba; desde el alta, al préstamo renovado.
+    if (desde === 'agenda' || desde === 'detalle') {
       router.back();
     } else {
-      router.replace({ pathname: '/prestamos/[id]', params: { id: vigente } });
+      router.replace({ pathname: '/prestamos/[id]', params: { id: prestamo.id } });
     }
     avisar(
       'Préstamo renovado',
-      `Le diste ${formatearPesos(elegido.entregado)} a ${prestamo.cliente_nombre}.`
+      `Le diste ${formatearPesos(entregado)} a ${prestamo.cliente_nombre}. Sus cuotas ya quedaron actualizadas.`
     );
   };
 
@@ -237,14 +219,14 @@ export default function RenovarScreen() {
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets>
         <ThemedText type="subtitle">{prestamo.cliente_nombre}</ThemedText>
-        <ThemedText themeColor="textSecondary">Paso {paso} de 3</ThemedText>
+        <ThemedText themeColor="textSecondary">Paso {paso} de 2</ThemedText>
 
         {paso === 1 ? (
           <>
             <ThemedView type="backgroundElement" style={styles.tarjeta}>
               <ThemedText style={styles.destacado}>Préstamo actual</ThemedText>
               <ThemedText style={styles.texto}>
-                Monto original: <Monto valor={prestamo.monto} />
+                Monto original: <Monto valor={montoOriginal(prestamo.monto, renovaciones)} />
               </ThemedText>
               <ThemedText style={styles.texto}>Interés: {prestamo.tasa_interes} %</ThemedText>
               <ThemedText style={styles.texto}>
@@ -296,24 +278,13 @@ export default function RenovarScreen() {
             />
 
             <ThemedText themeColor="textSecondary">
-              Se sigue cobrando {TEXTO_FRECUENCIA[prestamo.frecuencia]}, como hasta ahora. Si sumás
-              a las cuotas que quedan, el interés se cobra solo sobre la plata que le vas a dar.
+              Se sigue cobrando {TEXTO_FRECUENCIA[prestamo.frecuencia]}, como hasta ahora. El
+              interés se cobra solo sobre la plata que le vas a dar, y se suma a las cuotas que
+              quedan.
             </ThemedText>
 
-            <ThemedView type="backgroundElement" style={styles.tarjeta}>
-              <ThemedText style={styles.destacado}>Solo si descontás lo que debe</ThemedText>
-              <CampoTexto
-                etiqueta="Fecha de inicio (día/mes/año)"
-                value={fecha}
-                onChangeText={setFecha}
-                error={errores.fecha}
-                keyboardType="numbers-and-punctuation"
-                placeholder="Ej: 05/11/2026"
-              />
-            </ThemedView>
-
             <BotonGrande
-              texto="Ver las dos opciones"
+              texto="Revisar la renovación"
               onPress={() => {
                 if (validar()) irAPaso(2);
               }}
@@ -323,55 +294,98 @@ export default function RenovarScreen() {
 
         {paso === 2 ? (
           <>
-            <ThemedText style={styles.destacado}>
-              Le das <Monto valor={entregaNum} /> en mano. Elegí cómo renovar:
-            </ThemedText>
+            <ThemedText style={styles.titulo}>Revisá antes de confirmar</ThemedText>
 
-            <ThemedView type="backgroundElement" style={styles.tarjeta}>
-              <ThemedText style={styles.titulo}>Descontar lo que debe</ThemedText>
-              {descuento.valor ? (
-                <>
-                  <ComoPaga
-                    plan={planDescuento(descuento.valor, prestamo.frecuencia)}
-                    cuotaAntes={cuotaAntes}
-                    gruposAntes={gruposHoy}
-                  />
-                  <LineaTotal plan={planDescuento(descuento.valor, prestamo.frecuencia)} />
-                  <BotonGrande
-                    texto="Elegir: descontar"
-                    onPress={() => {
-                      setModo('descuento');
-                      irAPaso(3);
-                    }}
-                  />
-                </>
-              ) : (
-                <ThemedText style={[styles.texto, styles.error]}>{descuento.error}</ThemedText>
-              )}
-            </ThemedView>
+            {suma.error ? (
+              <ThemedText style={[styles.texto, styles.error]}>{suma.error}</ThemedText>
+            ) : null}
 
-            <ThemedView type="backgroundElement" style={styles.tarjeta}>
-              <ThemedText style={styles.titulo}>Sumar a las cuotas que quedan</ThemedText>
-              {suma.valor ? (
-                <>
-                  <ComoPaga
-                    plan={planSuma(suma.valor, pendientes, prestamo.frecuencia)}
-                    cuotaAntes={cuotaAntes}
-                    gruposAntes={gruposHoy}
-                  />
-                  <LineaTotal plan={planSuma(suma.valor, pendientes, prestamo.frecuencia)} />
-                  <BotonGrande
-                    texto="Elegir: sumar"
-                    onPress={() => {
-                      setModo('sumar');
-                      irAPaso(3);
-                    }}
-                  />
-                </>
-              ) : (
-                <ThemedText style={[styles.texto, styles.error]}>{suma.error}</ThemedText>
-              )}
-            </ThemedView>
+            {suma.valor && prevision && proximaNueva ? (
+              <>
+                <ThemedView type="backgroundElement" style={[styles.tarjeta, styles.entrega]}>
+                  <ThemedText style={styles.titulo}>Cómo va a pagar</ThemedText>
+                  <ThemedText style={styles.destacado}>
+                    Próxima cuota:{' '}
+                    <Monto valor={redondear(proximaNueva.monto - proximaNueva.montoPagado)} /> (el{' '}
+                    {formatearDiaMes(proximaNueva.fechaVencimiento)})
+                  </ThemedText>
+                  {proximaNueva.desglose ? (
+                    <ThemedText themeColor="textSecondary" style={styles.chico}>
+                      {formatearPesos(proximaNueva.monto)} = {proximaNueva.desglose}
+                      {proximaNueva.montoPagado > 0
+                        ? ` (ya pagó ${formatearPesos(proximaNueva.montoPagado)})`
+                        : ''}
+                    </ThemedText>
+                  ) : null}
+                  <ThemedText style={styles.texto}>
+                    Va a pagar:{' '}
+                    {textoCronograma(
+                      resumirCuotas(
+                        prevision.pendientes.map((q) => ({
+                          monto: redondear(q.monto - q.montoPagado),
+                        }))
+                      ),
+                      prestamo.frecuencia
+                    )}
+                  </ThemedText>
+                  <ThemedText themeColor="textSecondary" style={styles.texto}>
+                    Hasta ahora pagaba{' '}
+                    {gruposHoy.length > 1
+                      ? textoCronograma(gruposHoy, prestamo.frecuencia)
+                      : `${formatearPesos(cuotaAntes)} por cuota`}
+                  </ThemedText>
+                  <ThemedText style={styles.entregaLinea}>
+                    Le vas a dar hoy: <Monto valor={suma.valor.entregado} />
+                  </ThemedText>
+                </ThemedView>
+
+                <ThemedView type="backgroundElement" style={styles.tarjeta}>
+                  <ThemedText style={styles.destacado}>Cuándo cambia el monto</ThemedText>
+                  {explicarCronograma(prevision.pendientes).map((frase) => (
+                    <ThemedText key={frase} style={styles.texto}>
+                      {frase}
+                    </ThemedText>
+                  ))}
+                </ThemedView>
+
+                <ThemedView type="backgroundElement" style={styles.tarjeta}>
+                  <ThemedText style={styles.destacado}>Cómo quedan las cuotas</ThemedText>
+                  {prevision.lista.map((q) => (
+                    <View key={q.clave}>
+                      <ThemedText style={styles.texto}>
+                        Cuota {q.numero}: {formatearFecha(q.fechaVencimiento)} ·{' '}
+                        <Monto valor={q.monto} />
+                        {q.nota}
+                      </ThemedText>
+                      {q.desglose ? (
+                        <ThemedText themeColor="textSecondary" style={styles.chico}>
+                          {q.desglose}
+                        </ThemedText>
+                      ) : null}
+                    </View>
+                  ))}
+                </ThemedView>
+
+                <ThemedView type="backgroundElement" style={styles.tarjeta}>
+                  <ThemedText style={styles.destacado}>Cómo viene pagando</ThemedText>
+                  <IndicadorRiesgo nivel={perfil} />
+                  {perfil === 'riesgo' ? (
+                    <ThemedView style={styles.avisoRiesgo}>
+                      <ThemedText style={styles.textoAvisoRiesgo}>
+                        Este cliente tiene 2 o más cuotas vencidas sin cobrar
+                      </ThemedText>
+                    </ThemedView>
+                  ) : null}
+                </ThemedView>
+
+                <ThemedText themeColor="textSecondary" style={styles.chico}>
+                  Total a devolver: {formatearPesos(suma.valor.totalDesdeHoy)} · última cuota{' '}
+                  {formatearDiaMes(suma.valor.ultimaFecha)}
+                </ThemedText>
+
+                <BotonGrande texto="Confirmar renovación" onPress={confirmarRenovacion} />
+              </>
+            ) : null}
 
             <BotonGrande
               texto="Volver a cambiar los datos"
@@ -380,213 +394,8 @@ export default function RenovarScreen() {
             />
           </>
         ) : null}
-
-        {paso === 3 ? (
-          <>
-            <ThemedText style={styles.titulo}>Revisá antes de confirmar</ThemedText>
-
-            {planElegido ? (
-              <ThemedView type="backgroundElement" style={[styles.tarjeta, styles.entrega]}>
-                <ThemedText style={styles.titulo}>Cómo va a pagar</ThemedText>
-                <ComoPaga plan={planElegido} />
-              </ThemedView>
-            ) : null}
-
-            <ThemedView type="backgroundElement" style={styles.tarjeta}>
-              <ThemedText style={styles.destacado}>Préstamo actual</ThemedText>
-              <ThemedText style={styles.texto}>
-                Monto original: <Monto valor={prestamo.monto} />
-              </ThemedText>
-              <ThemedText style={styles.texto}>
-                Empezó el {formatearFecha(prestamo.fecha_inicio)}
-              </ThemedText>
-              <ThemedText style={styles.texto}>
-                Cuotas pagas: {pagas} de {vigentes.length}
-              </ThemedText>
-              <ThemedText style={styles.texto}>
-                Cobrado: <Monto valor={cobrado} />
-              </ThemedText>
-              <ThemedText style={styles.texto}>
-                Falta: <Monto valor={deuda} />
-              </ThemedText>
-            </ThemedView>
-
-            <ThemedView type="backgroundElement" style={styles.tarjeta}>
-              <ThemedText style={styles.destacado}>Qué se hace</ThemedText>
-              <ThemedText style={styles.texto}>
-                {modo === 'descuento'
-                  ? `Se cierra este préstamo y se hace uno nuevo de ${formatearPesos(planElegido?.creditoTotal ?? 0)}: los ${formatearPesos(deuda)} que debe más los ${formatearPesos(entregaNum)} que le vas a dar. El interés se cobra sobre todo ese monto.`
-                  : `Le vas a dar ${formatearPesos(entregaNum)}. El interés se cobra solo sobre esa plata, y las cuotas nuevas se suman a las que le quedan, de la más vieja a la más nueva.`}
-              </ThemedText>
-            </ThemedView>
-
-            <ThemedView type="backgroundElement" style={styles.tarjeta}>
-              <ThemedText style={styles.destacado}>Cómo queda</ThemedText>
-              {modo === 'descuento' && descuento.valor
-                ? descuento.valor.cuotas.map((q) => (
-                    <ThemedText key={q.numero} style={styles.texto}>
-                      Cuota {q.numero}: {formatearFecha(q.fechaVencimiento)} ·{' '}
-                      <Monto valor={q.monto} />
-                    </ThemedText>
-                  ))
-                : null}
-              {modo === 'sumar' && suma.valor ? (
-                <ListaSuma cuotas={vigentes} r={suma.valor} />
-              ) : null}
-            </ThemedView>
-
-            <ThemedView type="backgroundElement" style={styles.tarjeta}>
-              <ThemedText style={styles.destacado}>Cómo viene pagando</ThemedText>
-              <IndicadorRiesgo nivel={perfil} />
-              {perfil === 'riesgo' ? (
-                <ThemedView style={styles.avisoRiesgo}>
-                  <ThemedText style={styles.textoAvisoRiesgo}>
-                    Este cliente tiene 2 o más cuotas vencidas sin cobrar
-                  </ThemedText>
-                </ThemedView>
-              ) : null}
-            </ThemedView>
-
-            {planElegido ? <LineaTotal plan={planElegido} /> : null}
-
-            <BotonGrande texto="Confirmar renovación" onPress={confirmarRenovacion} />
-            <BotonGrande
-              texto="Volver a las dos opciones"
-              variante="secundario"
-              onPress={() => irAPaso(2)}
-            />
-          </>
-        ) : null}
       </ScrollView>
     </ThemedView>
-  );
-}
-
-// Lo que va a pagar el cliente de ahora en adelante con cada modo.
-type Plan = {
-  proxima: { monto: number; fecha: string };
-  grupos: GrupoCuotas[];
-  frecuencia: Frecuencia;
-  entregado: number;
-  creditoTotal: number;
-  deuda: number;
-  total: number;
-  ultimaFecha: string;
-};
-
-function planDescuento(r: ResultadoDescuento, frecuencia: Frecuencia): Plan {
-  return {
-    proxima: { monto: r.cuotas[0].monto, fecha: r.cuotas[0].fechaVencimiento },
-    grupos: resumirCuotas(r.cuotas),
-    frecuencia,
-    entregado: r.entregado,
-    creditoTotal: r.creditoTotal,
-    deuda: r.deuda,
-    total: r.total,
-    ultimaFecha: r.ultimaFecha,
-  };
-}
-
-// Con "sumar" sigue pagando las cuotas pendientes (las agrandadas y las que sobran del préstamo
-// anterior) y después las agregadas. De cada pendiente cuenta lo que falta pagar.
-function planSuma(r: ResultadoSuma, pendientes: CuotaActual[], frecuencia: Frecuencia): Plan {
-  const cambios = new Map(r.modificadas.map((q) => [q.id, q.monto]));
-  const desdeHoy = [
-    ...pendientes.map((q) => ({
-      monto: Math.round(((cambios.get(q.id) ?? q.monto) - q.montoPagado) * 100) / 100,
-      fecha: q.fechaVencimiento,
-    })),
-    ...r.agregadas.map((q) => ({ monto: q.monto, fecha: q.fechaVencimiento })),
-  ];
-  return {
-    proxima: desdeHoy[0],
-    grupos: resumirCuotas(desdeHoy),
-    frecuencia,
-    entregado: r.entregado,
-    creditoTotal: r.creditoTotal,
-    deuda: r.deuda,
-    total: r.totalDesdeHoy,
-    ultimaFecha: r.ultimaFecha,
-  };
-}
-
-function ComoPaga({
-  plan,
-  cuotaAntes,
-  gruposAntes = [],
-}: {
-  plan: Plan;
-  cuotaAntes?: number;
-  gruposAntes?: GrupoCuotas[]; // las cuotas pendientes antes de renovar
-}) {
-  return (
-    <>
-      <ThemedText style={styles.destacado}>
-        Próxima cuota: <Monto valor={plan.proxima.monto} /> (el{' '}
-        {formatearDiaMes(plan.proxima.fecha)})
-      </ThemedText>
-      <ThemedText style={styles.texto}>
-        Va a pagar: {textoCronograma(plan.grupos, plan.frecuencia)}
-      </ThemedText>
-      {cuotaAntes !== undefined ? (
-        <ThemedText themeColor="textSecondary" style={styles.texto}>
-          Hasta ahora pagaba{' '}
-          {gruposAntes.length > 1
-            ? textoCronograma(gruposAntes, plan.frecuencia)
-            : `${formatearPesos(cuotaAntes)} por cuota`}
-        </ThemedText>
-      ) : null}
-      <ThemedText style={styles.entregaLinea}>
-        Le vas a dar hoy: <Monto valor={plan.entregado} />
-      </ThemedText>
-      <ThemedText themeColor="textSecondary" style={styles.chico}>
-        Crédito total: {formatearPesos(plan.creditoTotal)} (debe {formatearPesos(plan.deuda)} + le
-        das {formatearPesos(plan.entregado)})
-      </ThemedText>
-    </>
-  );
-}
-
-function LineaTotal({ plan }: { plan: Plan }) {
-  return (
-    <ThemedText themeColor="textSecondary" style={styles.chico}>
-      Total a devolver: {formatearPesos(plan.total)} · última cuota{' '}
-      {formatearDiaMes(plan.ultimaFecha)}
-    </ThemedText>
-  );
-}
-
-// Todas las cuotas del préstamo como quedan después de sumar: las pagas igual, las pendientes
-// agrandadas y las nuevas al final.
-function ListaSuma({ cuotas, r }: { cuotas: CuotaActual[]; r: ResultadoSuma }) {
-  const cambios = new Map(r.modificadas.map((q) => [q.id, q.monto]));
-  const lista = [
-    ...[...cuotas]
-      .sort((a, b) => a.numero - b.numero)
-      .map((q) => ({
-        clave: `c${q.id}`,
-        numero: q.numero,
-        fecha: q.fechaVencimiento,
-        monto: cambios.get(q.id) ?? q.monto,
-        nota: q.estado === 'pagada' ? ' (pagada)' : cambios.has(q.id) ? ' (agrandada)' : '',
-      })),
-    ...r.agregadas.map((q) => ({
-      clave: `n${q.numero}`,
-      numero: q.numero,
-      fecha: q.fechaVencimiento,
-      monto: q.monto,
-      nota: ' (nueva)',
-    })),
-  ];
-  return (
-    <>
-      {lista.map((q) => (
-        <ThemedText key={q.clave} style={styles.texto}>
-          Cuota {q.numero}: {formatearFecha(q.fecha)} · <Monto valor={q.monto} />
-          {q.nota}
-        </ThemedText>
-      ))}
-    </>
   );
 }
 
@@ -598,6 +407,10 @@ const TEXTO_FRECUENCIA = {
 
 function textoCuotas(cantidad: number): string {
   return cantidad === 1 ? '1 cuota' : `${cantidad} cuotas`;
+}
+
+function redondear(valor: number): number {
+  return Math.round(valor * 100) / 100;
 }
 
 const styles = StyleSheet.create({
