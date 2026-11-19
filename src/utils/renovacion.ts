@@ -219,13 +219,35 @@ const UNA_POR: Record<Frecuencia, string> = {
   mensual: 'una por mes',
 };
 
-// "4 cuotas de $ 73.500, después 6 cuotas de $ 13.500, una por mes".
-export function textoCronograma(grupos: GrupoCuotas[], frecuencia: Frecuencia): string {
+// "4 cuotas de $ 73.500, después 6 cuotas de $ 13.500, una por mes". Sin `frecuencia`, termina en
+// el último monto.
+export function textoCronograma(grupos: GrupoCuotas[], frecuencia?: Frecuencia): string {
   if (grupos.length === 0) return '';
   const partes = grupos.map(
     (g) => `${g.cantidad === 1 ? '1 cuota' : `${g.cantidad} cuotas`} de ${formatearPesos(g.monto)}`
   );
-  return `${partes.join(', después ')}, ${UNA_POR[frecuencia]}`;
+  const cronograma = partes.join(', después ');
+  return frecuencia ? `${cronograma}, ${UNA_POR[frecuencia]}` : cronograma;
+}
+
+// Lo que falta pagar de las cuotas pendientes, contando de cada una lo que queda (monto − pagado):
+// "Faltan pagar 2 cuotas de $ 25.000 · $ 50.000 en total". null si no falta nada.
+export function resumirFaltante(
+  cuotas: CuotaActual[],
+  hoy: string // 'YYYY-MM-DD'
+): { texto: string; vencidas: number } | null {
+  const pendientes = cuotasPendientes(cuotas).filter((q) => q.monto - q.montoPagado > 0);
+  if (pendientes.length === 0) return null;
+  const cronograma = textoCronograma(
+    resumirCuotas(pendientes.map((q) => ({ monto: redondear(q.monto - q.montoPagado) })))
+  );
+  return {
+    texto:
+      pendientes.length === 1
+        ? `Falta pagar ${cronograma}`
+        : `Faltan pagar ${cronograma} · ${formatearPesos(calcularDeuda(cuotas))} en total`,
+    vencidas: pendientes.filter((q) => q.fechaVencimiento < hoy).length,
+  };
 }
 
 function redondear(valor: number): number {

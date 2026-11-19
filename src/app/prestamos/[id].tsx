@@ -30,6 +30,7 @@ import {
 import { formatearDiaMes, formatearFecha, hoyISO } from '@/utils/formato';
 import { calcularMoraPendiente } from '@/utils/mora';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
+import { resumirFaltante } from '@/utils/renovacion';
 
 const COLOR_PAGADA = Colors.primary;
 const COLOR_VENCIDA = Colors.danger;
@@ -105,6 +106,20 @@ export default function DetallePrestamoScreen() {
   const faltaCobrar = redondear(
     vigentes.reduce((suma, q) => suma + Math.max(0, q.monto - q.monto_pagado), 0)
   );
+  const faltante =
+    prestamo.estado === 'activo'
+      ? resumirFaltante(
+          cuotas.map((q) => ({
+            id: q.id,
+            numero: q.numero,
+            fechaVencimiento: q.fecha_vencimiento,
+            monto: q.monto,
+            montoPagado: q.monto_pagado,
+            estado: q.estado,
+          })),
+          hoy
+        )
+      : null;
   const moraCobrada = redondear(cuotas.reduce((suma, q) => suma + q.mora_pagada, 0));
   // Suma de las cuotas: coincide con monto + interés, salvo que se haya editado alguna cuota.
   const totalADevolver = redondear(vigentes.reduce((suma, q) => suma + q.monto, 0));
@@ -223,6 +238,17 @@ export default function DetallePrestamoScreen() {
           <ThemedText style={styles.destacado}>
             Falta cobrar: <Monto valor={faltaCobrar} />
           </ThemedText>
+          {faltante ? (
+            <ThemedText style={styles.texto}>
+              {faltante.texto}
+              {faltante.vencidas > 0 ? (
+                <ThemedText style={styles.vencida}>
+                  {' '}
+                  ({faltante.vencidas === 1 ? '1 vencida' : `${faltante.vencidas} vencidas`})
+                </ThemedText>
+              ) : null}
+            </ThemedText>
+          ) : null}
         </ThemedView>
 
         {sePuedeRenovar ? (
