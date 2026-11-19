@@ -16,9 +16,10 @@ Trabajo práctico de Seminario (UTN). Todo funciona en el celular, sin cuentas y
   - **Cada tarjeta muestra:**
     - "Cobrar ahora" (lo atrasado más lo de hoy), la cantidad de cuotas y hace cuánto venció la más vieja;
     - si tiene cuotas en los próximos días, cuánto y cuándo ("Después: $Y el DD/MM");
+    - si una cuota viene de más de un crédito, de qué se compone;
     - la dirección y el teléfono.
   - **Botones:** "Cómo llegar" (abre Google Maps), "Llamar" (abre el marcador del teléfono), "Cobrar" y "Renovar".
-- **Cobro por cliente** (desde la Agenda): "¿Cuánto te pagó?" viene cargado con lo que hay que cobrar ahora. Antes de confirmar muestra a qué cuotas se aplica, por ejemplo "Cuota 3: completa" y "Cuota 4: $5.000 de $30.000".
+- **Cobro por cliente** (desde la Agenda): "¿Cuánto te pagó?" viene cargado con lo que hay que cobrar ahora. Antes de confirmar muestra a qué cuotas se aplica, por ejemplo "Cuota 3: completa" y "Cuota 4: $5.000 de $30.000", con el desglose de las que vienen de más de un crédito: "Cuota $42.500: $25.000 del crédito original + $17.500 del crédito nuevo de $70.000".
 - **Clientes:**
   - alta con nombre, teléfono, dirección y notas, con aviso si ya existe uno con el mismo nombre y dirección;
   - buscador por nombre (sin distinguir mayúsculas ni acentos);
@@ -31,14 +32,15 @@ Trabajo práctico de Seminario (UTN). Todo funciona en el celular, sin cuentas y
   - listas de préstamos activos y saldados (los renovados aparecen con los saldados).
 - **Detalle del préstamo:**
   - datos, lo cobrado, lo que falta y la lista de cuotas;
-  - debajo de "Falta cobrar", una línea con lo que queda de cada cuota: "Faltan pagar 2 cuotas de $25.000 · $50.000 en total" y, si corresponde, "(N vencidas)" en rojo;
+  - debajo de "Falta cobrar", una línea con lo que queda de cada cuota: "Faltan pagar 2 cuotas de $25.000 · $50.000 en total", "baja a $X desde el DD/MM" si el monto baja y, si corresponde, "(N vencidas)" en rojo;
+  - si tuvo renovaciones, la sección "De qué se compone": el crédito original y cada renovación, con la fecha, la plata que se le dio, el interés y cuánto suma por cuota;
+  - cada cuota con más de una parte muestra su desglose: "$25.000 original + $17.500 renovación del 18/11";
   - cobrar una cuota (también pagos parciales) y editar la fecha y el monto de una cuota pendiente;
   - "Renovar préstamo" y, si hubo una renovación, la línea "Renovado el DD/MM";
   - eliminar el préstamo si todavía no tiene pagos y no participó de una renovación.
-- **Renovación**, en tres pasos:
-  1. **Datos:** una ficha del préstamo actual, con "Debe hoy" destacado, y la pregunta "¿Cuánta plata le vas a dar en mano?", junto con el interés y la cantidad de cuotas.
-  2. **Comparación:** una tarjeta por modo, con la próxima cuota, lo que va a pagar ("2 cuotas de $45.000, después 2 cuotas de $15.000, una por semana"), "Hasta ahora pagaba", "Le vas a dar hoy" y el crédito total. El total a devolver y la última cuota van al final, en chico.
-  3. **Revisión:** arriba, el recuadro "Cómo va a pagar". Después, el préstamo actual, qué se hace, cómo queda cada cuota y el perfil de riesgo del cliente. El total a devolver va al final, en chico.
+- **Renovación**, en dos pasos:
+  1. **Datos:** una ficha del préstamo actual, con "Debe hoy" destacado, y la pregunta "¿Cuánta plata le vas a dar en mano?", junto con el interés total y la cantidad de cuotas.
+  2. **Revisión:** arriba, el recuadro "Cómo va a pagar", con la próxima cuota y su desglose ("$45.000 = $30.000 del crédito anterior + $15.000 del crédito nuevo"), lo que va a pagar, "Hasta ahora pagaba" y "Le vas a dar hoy". Después, cuándo cambia el monto y por qué, cómo queda cada cuota y el perfil de riesgo del cliente. El total a devolver y la última cuota van al final, en chico.
 - **Resumen:** total prestado, total cobrado, lo que falta cobrar, cuotas atrasadas y cantidad de préstamos activos y saldados. Los totales se muestran en pesos enteros.
 - **Ajustes** (desde Resumen): borrar todos los datos, con doble confirmación, y cargar los datos de ejemplo (solo en modo desarrollo).
 - **Recordatorios:** una notificación a las 9:00 de cada día de los próximos 14 que tenga cobros ("Hoy tenés N cobros por $X").
@@ -138,18 +140,20 @@ src/
 Un cliente no puede tener dos préstamos activos a la vez. En el alta, los que ya tienen uno aparecen con la etiqueta "Ya tiene un préstamo" y la app ofrece renovarlo.
 
 ### Renovación (`src/utils/renovacion.ts`)
-Se escribe cuánta plata se le va a dar en mano (**E**), que tiene que ser mayor que cero. La **deuda** es lo que falta pagar de las cuotas pendientes, y el **crédito total** se calcula: **E + deuda**. La renovación mantiene la frecuencia del préstamo.
+Hay una sola forma de renovar, y el préstamo sigue siendo uno solo. Se escribe cuánta plata se le va a dar en mano (**E**), que tiene que ser mayor que cero, el interés total y la cantidad de cuotas. El interés se cobra solo sobre E. Con ese monto se calculan cuotas nuevas, y cada una se suma a una cuota pendiente, de la más vieja a la más nueva. Si las nuevas son más que las pendientes, las que sobran se agregan al final con la misma frecuencia; si son menos, solo crecen las primeras. Una cuota con un pago parcial conserva lo pagado, y la renovación mantiene la frecuencia del préstamo.
 
-- **Descontar lo que debe:** el interés se cobra sobre todo el crédito. Se hace un préstamo nuevo por ese total, el anterior queda como "renovado" y sus cuotas pendientes se cancelan. Se elige la fecha de inicio del préstamo nuevo.
-- **Sumar a las cuotas que quedan:** el interés se cobra solo sobre E. Con ese monto se calculan cuotas nuevas, y cada una se suma a una cuota pendiente, de la más vieja a la más nueva. Si las nuevas son más que las pendientes, las que sobran se agregan al final con la misma frecuencia; si son menos, solo crecen las primeras. Una cuota con un pago parcial conserva lo pagado.
+Ejemplo: le quedan 2 cuotas de $30.000 y se le dan $50.000 en mano, al 20 % en 4 cuotas. Se suman 4 partes de $15.000:
 
-Ejemplo: le quedan 2 cuotas de $30.000 (debe $60.000) y se le dan $50.000 en mano, al 20 % en 4 cuotas. El crédito total es de $110.000.
+| Cuota | Monto | Crédito original | Crédito nuevo |
+|---|---|---|---|
+| 3 | $45.000 | $30.000 | $15.000 |
+| 4 | $45.000 | $30.000 | $15.000 |
+| 5 | $15.000 | | $15.000 |
+| 6 | $15.000 | | $15.000 |
 
-| | Descontar | Sumar |
-|---|---|---|
-| Interés sobre | $110.000 | $50.000 |
-| Cuotas que quedan | $33.000, $33.000, $33.000, $33.000 | $45.000, $45.000, $15.000, $15.000 |
-| Total a pagar desde hoy | $132.000 | $120.000 |
+Cada cuota recuerda de qué crédito viene cada parte (tabla `cuota_adicionales`, agregada en la versión 3 de la base). Lo que no figura ahí es del crédito original, así que los datos anteriores se conservan sin cambios. Con eso la app explica los cambios de monto: "Hasta la cuota 4 (DD/MM): $45.000; después baja a $15.000 porque termina el crédito original".
+
+La forma anterior, "Descontar lo que debe", ya no aparece en la pantalla. Su código queda sin usar y las renovaciones hechas de esa manera se siguen viendo.
 
 Se puede renovar desde:
 - **Préstamos:** con "Renovar préstamo" en el detalle, o al elegir en el alta a un cliente que ya tiene un préstamo activo.
