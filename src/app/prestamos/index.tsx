@@ -1,7 +1,7 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BotonGrande } from '@/components/boton-grande';
@@ -13,6 +13,7 @@ import { Monto } from '@/components/monto';
 import { OpcionGrande } from '@/components/opcion-grande';
 import { EncabezadoPantalla } from '@/components/encabezado-pantalla';
 import { GuiaPasos } from '@/components/guia-pasos';
+import { TarjetaPrestamo } from '@/components/tarjeta-prestamo';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Colors, EstiloTarjeta, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -58,6 +59,8 @@ export default function PrestamosScreen() {
   const db = useSQLiteContext();
   const avisar = useAviso();
   const confirmar = useConfirmar();
+  // Viene de la pestaña Clientes: abre el alta con ese cliente ya elegido.
+  const { cliente: clientePedido } = useLocalSearchParams<{ cliente?: string }>();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const scrollRef = useRef<ScrollView>(null);
   const [clienteId, setClienteId] = useState<number | null>(null);
@@ -91,11 +94,17 @@ export default function PrestamosScreen() {
         if (!activo) return;
         setClientes(filasClientes);
         setConPrestamo(idsConPrestamo);
+        const sePuedeElegir = (id: number) =>
+          filasClientes.some((c) => c.id === id) && !idsConPrestamo.has(id);
+        const pedido = Number(clientePedido);
         setClienteId((id) =>
-          id !== null && filasClientes.some((c) => c.id === id) && !idsConPrestamo.has(id)
-            ? id
-            : null
+          sePuedeElegir(pedido) ? pedido : id !== null && sePuedeElegir(id) ? id : null
         );
+        if (clientePedido) {
+          setBusqueda('');
+          scrollRef.current?.scrollTo({ y: 0, animated: false });
+          router.setParams({ cliente: undefined });
+        }
         setPrestamos(filasPrestamos);
         setPerfiles(perfilesClientes);
       });
@@ -103,7 +112,7 @@ export default function PrestamosScreen() {
         activo = false;
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [db, recarga, verSaldados])
+    }, [db, recarga, verSaldados, clientePedido])
   );
 
   // Con muchos clientes se muestran solo los primeros que coinciden con la búsqueda.
@@ -363,47 +372,7 @@ export default function PrestamosScreen() {
           ) : prestamos.length === 0 ? (
             <ThemedText style={styles.texto}>Todavía no hay préstamos activos</ThemedText>
           ) : (
-            prestamos.map((prestamo) => (
-              <Pressable
-                key={prestamo.id}
-                accessibilityRole="button"
-                onPress={() =>
-                  router.push({
-                    pathname: '/prestamos/[id]',
-                    params: { id: prestamo.id },
-                  })
-                }
-                style={({ pressed }) => pressed && styles.presionado}>
-                <ThemedView type="backgroundElement" style={styles.tarjeta}>
-                  <ThemedText style={styles.nombre}>{prestamo.cliente_nombre}</ThemedText>
-                  {prestamo.estado === 'renovado' ? (
-                    <ThemedText style={styles.texto} themeColor="textSecondary">
-                      Renovado: lo que debía pasó a un préstamo nuevo
-                    </ThemedText>
-                  ) : null}
-                  <ThemedText style={styles.texto}>
-                    Prestado: <Monto valor={prestamo.monto} />
-                  </ThemedText>
-                  <ThemedText style={styles.texto}>
-                    Cuotas pagas: {prestamo.cuotas_pagadas} de {prestamo.cant_cuotas}
-                  </ThemedText>
-                  <ThemedText style={styles.texto}>
-                    Cobrado: <Monto valor={prestamo.cobrado} enteros />
-                  </ThemedText>
-                  <ThemedText style={styles.texto}>
-                    Falta cobrar: <Monto valor={prestamo.falta_cobrar} enteros />
-                  </ThemedText>
-                  {prestamo.proximo_vencimiento ? (
-                    <ThemedText style={styles.texto}>
-                      Próximo vencimiento: {formatearFecha(prestamo.proximo_vencimiento)}
-                    </ThemedText>
-                  ) : null}
-                  <ThemedText style={styles.ayuda} themeColor="textSecondary">
-                    Tocá para ver las cuotas
-                  </ThemedText>
-                </ThemedView>
-              </Pressable>
-            ))
+            prestamos.map((prestamo) => <TarjetaPrestamo key={prestamo.id} prestamo={prestamo} />)
           )}
         </ScrollView>
       </SafeAreaView>
@@ -459,19 +428,6 @@ const styles = StyleSheet.create({
   },
   tituloLista: {
     marginTop: Spacing.four,
-  },
-  tarjeta: EstiloTarjeta,
-  nombre: {
-    fontSize: 24,
-    lineHeight: 32,
-    fontWeight: '700',
-  },
-  presionado: {
-    opacity: 0.7,
-  },
-  ayuda: {
-    fontSize: 20,
-    lineHeight: 28,
   },
   textoVistaPrevia: {
     fontSize: 24,

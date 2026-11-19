@@ -210,15 +210,7 @@ export type PrestamoListado = {
   estado: 'activo' | 'saldado' | 'renovado';
 };
 
-// Préstamos activos o cerrados con el avance de sus cuotas. "saldado" trae también los renovados
-// (cerrados por una renovación), para que sigan a la vista. Primero los que vencen antes; los
-// cerrados, del más nuevo al más viejo.
-export async function listarPrestamos(
-  db: SQLiteDatabase,
-  estado: 'activo' | 'saldado'
-): Promise<PrestamoListado[]> {
-  return db.getAllAsync<PrestamoListado>(
-    `SELECT p.id, c.nombre AS cliente_nombre, p.monto, p.cant_cuotas, p.estado,
+const SELECT_PRESTAMO_LISTADO = `SELECT p.id, c.nombre AS cliente_nombre, p.monto, p.cant_cuotas, p.estado,
             (SELECT COUNT(*) FROM cuotas q
               WHERE q.prestamo_id = p.id AND q.estado = 'pagada') AS cuotas_pagadas,
             (SELECT COALESCE(SUM(q.monto_pagado), 0) FROM cuotas q
@@ -228,12 +220,43 @@ export async function listarPrestamos(
             (SELECT MIN(q.fecha_vencimiento) FROM cuotas q
               WHERE q.prestamo_id = p.id AND q.estado = 'pendiente') AS proximo_vencimiento
        FROM prestamos p
-       JOIN clientes c ON c.id = p.cliente_id
+       JOIN clientes c ON c.id = p.cliente_id`;
+
+// Préstamos activos o cerrados con el avance de sus cuotas. "saldado" trae también los renovados
+// (cerrados por una renovación), para que sigan a la vista. Primero los que vencen antes; los
+// cerrados, del más nuevo al más viejo.
+export async function listarPrestamos(
+  db: SQLiteDatabase,
+  estado: 'activo' | 'saldado'
+): Promise<PrestamoListado[]> {
+  return db.getAllAsync<PrestamoListado>(
+    `${SELECT_PRESTAMO_LISTADO}
       WHERE (? = 'activo' AND p.estado = 'activo')
          OR (? = 'saldado' AND p.estado IN ('saldado', 'renovado'))
       ORDER BY proximo_vencimiento, p.id DESC`,
     [estado, estado]
   );
+}
+
+// Todos los préstamos de un cliente, del más nuevo al más viejo.
+export async function listarPrestamosDeCliente(
+  db: SQLiteDatabase,
+  clienteId: number
+): Promise<PrestamoListado[]> {
+  return db.getAllAsync<PrestamoListado>(
+    `${SELECT_PRESTAMO_LISTADO}
+      WHERE p.cliente_id = ?
+      ORDER BY p.id DESC`,
+    [clienteId]
+  );
+}
+
+// Clientes con préstamos anteriores (saldados o renovados).
+export async function clientesConHistorial(db: SQLiteDatabase): Promise<Set<number>> {
+  const filas = await db.getAllAsync<{ cliente_id: number }>(
+    "SELECT DISTINCT cliente_id FROM prestamos WHERE estado IN ('saldado', 'renovado')"
+  );
+  return new Set(filas.map((f) => f.cliente_id));
 }
 
 export type PrestamoDetalle = {

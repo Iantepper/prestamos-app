@@ -1,7 +1,7 @@
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BotonGrande } from '@/components/boton-grande';
@@ -27,6 +27,7 @@ import {
   type ClienteNuevo,
   type DeudaCliente,
 } from '@/db/clientes';
+import { clientesConHistorial, clientesConPrestamoActivo } from '@/db/prestamos';
 import { obtenerPerfilesRiesgo } from '@/db/riesgo';
 import { filtrarPorNombre } from '@/utils/busqueda';
 import { hoyISO } from '@/utils/formato';
@@ -50,6 +51,8 @@ export default function ClientesScreen() {
   const nombreRef = useRef<TextInput>(null);
   const [perfiles, setPerfiles] = useState<Map<number, NivelRiesgo>>(new Map());
   const [deudas, setDeudas] = useState<Map<number, DeudaCliente>>(new Map());
+  const [conPrestamo, setConPrestamo] = useState<Map<number, number>>(new Map());
+  const [conHistorial, setConHistorial] = useState<Set<number>>(new Set());
   const [recarga, setRecarga] = useState(0);
   const [clienteAEditar, setClienteAEditar] = useState<Cliente | null>(null);
   const [busqueda, setBusqueda] = useState('');
@@ -64,11 +67,15 @@ export default function ClientesScreen() {
         listarClientes(db),
         obtenerPerfilesRiesgo(db, hoy),
         obtenerDeudasClientes(db, hoy),
-      ]).then(([filas, perfilesClientes, deudasClientes]) => {
+        clientesConPrestamoActivo(db),
+        clientesConHistorial(db),
+      ]).then(([filas, perfilesClientes, deudasClientes, activos, historial]) => {
         if (!activo) return;
         setClientes(filas);
         setPerfiles(perfilesClientes);
         setDeudas(deudasClientes);
+        setConPrestamo(activos);
+        setConHistorial(historial);
       });
       return () => {
         activo = false;
@@ -76,6 +83,16 @@ export default function ClientesScreen() {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [db, recarga])
   );
+
+  // Tocar un cliente abre su préstamo activo o, si no tiene, el alta con ese cliente ya elegido.
+  const abrirCliente = (cliente: Cliente) => {
+    const prestamo = conPrestamo.get(cliente.id);
+    if (prestamo !== undefined) {
+      router.push({ pathname: '/prestamos/[id]', params: { id: prestamo } }, { withAnchor: true });
+    } else {
+      router.navigate({ pathname: '/prestamos', params: { cliente: cliente.id } });
+    }
+  };
 
   const validar = (): boolean => {
     const nuevos: Errores = {};
@@ -284,32 +301,55 @@ export default function ClientesScreen() {
               ) : null}
               {clientesFiltrados.map((cliente) => (
                 <ThemedView key={cliente.id} type="backgroundElement" style={styles.tarjeta}>
-                  <ThemedText style={styles.nombre}>{cliente.nombre}</ThemedText>
-                  <IndicadorRiesgo nivel={perfiles.get(cliente.id) ?? 'nuevo'} />
-                  {deudas.has(cliente.id) ? (
-                    <ThemedText style={styles.dato}>
-                      Debe en total: <Monto valor={deudas.get(cliente.id)!.debe} enteros />
-                    </ThemedText>
-                  ) : null}
-                  {(deudas.get(cliente.id)?.vencido ?? 0) > 0 ? (
-                    <ThemedText style={[styles.dato, styles.vencido]}>
-                      Vencido: <Monto valor={deudas.get(cliente.id)!.vencido} enteros />
-                    </ThemedText>
-                  ) : null}
-                  {cliente.telefono ? (
-                    <ThemedText style={styles.dato}>{cliente.telefono}</ThemedText>
-                  ) : null}
-                  <ThemedText style={styles.dato}>{cliente.direccion}</ThemedText>
-                  {cliente.notas ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => abrirCliente(cliente)}
+                    style={({ pressed }) => [styles.datos, pressed && styles.presionado]}>
+                    <ThemedText style={styles.nombre}>{cliente.nombre}</ThemedText>
+                    <IndicadorRiesgo nivel={perfiles.get(cliente.id) ?? 'nuevo'} />
+                    {deudas.has(cliente.id) ? (
+                      <ThemedText style={styles.dato}>
+                        Debe en total: <Monto valor={deudas.get(cliente.id)!.debe} enteros />
+                      </ThemedText>
+                    ) : null}
+                    {(deudas.get(cliente.id)?.vencido ?? 0) > 0 ? (
+                      <ThemedText style={[styles.dato, styles.vencido]}>
+                        Vencido: <Monto valor={deudas.get(cliente.id)!.vencido} enteros />
+                      </ThemedText>
+                    ) : null}
+                    {cliente.telefono ? (
+                      <ThemedText style={styles.dato}>{cliente.telefono}</ThemedText>
+                    ) : null}
+                    <ThemedText style={styles.dato}>{cliente.direccion}</ThemedText>
+                    {cliente.notas ? (
+                      <ThemedText style={styles.dato} themeColor="textSecondary">
+                        {cliente.notas}
+                      </ThemedText>
+                    ) : null}
                     <ThemedText style={styles.dato} themeColor="textSecondary">
-                      {cliente.notas}
+                      {conPrestamo.has(cliente.id)
+                        ? 'Tocá para ver su préstamo'
+                        : 'Tocá para darle un préstamo'}
                     </ThemedText>
-                  ) : null}
+                  </Pressable>
                   {cliente.telefono ? (
                     <BotonGrande
                       texto="Llamar"
                       icono={{ ios: 'phone.fill', android: 'call', web: 'call' }}
                       onPress={() => llamar(cliente.telefono ?? '')}
+                      style={styles.botonLlamar}
+                    />
+                  ) : null}
+                  {conHistorial.has(cliente.id) ? (
+                    <BotonGrande
+                      texto="Ver préstamos"
+                      variante="secundario"
+                      onPress={() =>
+                        router.push(
+                          { pathname: '/prestamos/cliente', params: { id: cliente.id } },
+                          { withAnchor: true }
+                        )
+                      }
                       style={styles.botonLlamar}
                     />
                   ) : null}
@@ -380,6 +420,12 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two,
   },
   tarjeta: EstiloTarjeta,
+  datos: {
+    gap: Spacing.two,
+  },
+  presionado: {
+    opacity: 0.7,
+  },
   vencido: {
     color: Colors.danger,
     fontWeight: '700',
