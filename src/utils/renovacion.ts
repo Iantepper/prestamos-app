@@ -196,6 +196,37 @@ export function describirCuotas(cuotas: { numero: number; monto: number }[]): st
     .join('; ');
 }
 
+export type GrupoCuotas = { cantidad: number; monto: number };
+
+// Agrupa cuotas seguidas con el mismo monto (diferencia menor a un centavo), en el orden dado.
+export function resumirCuotas(cuotas: { monto: number }[]): GrupoCuotas[] {
+  const grupos: GrupoCuotas[] = [];
+  for (const q of cuotas) {
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo && Math.abs(ultimo.monto - q.monto) < 0.01) {
+      ultimo.cantidad++;
+    } else {
+      grupos.push({ cantidad: 1, monto: q.monto });
+    }
+  }
+  return grupos;
+}
+
+const UNA_POR: Record<Frecuencia, string> = {
+  semanal: 'una por semana',
+  quincenal: 'una cada 15 días',
+  mensual: 'una por mes',
+};
+
+// "4 cuotas de $ 73.500, después 6 cuotas de $ 13.500, una por mes".
+export function textoCronograma(grupos: GrupoCuotas[], frecuencia: Frecuencia): string {
+  if (grupos.length === 0) return '';
+  const partes = grupos.map(
+    (g) => `${g.cantidad === 1 ? '1 cuota' : `${g.cantidad} cuotas`} de ${formatearPesos(g.monto)}`
+  );
+  return `${partes.join(', después ')}, ${UNA_POR[frecuencia]}`;
+}
+
 function redondear(valor: number): number {
   return Math.round(valor * 100) / 100;
 }
