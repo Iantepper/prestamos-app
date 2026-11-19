@@ -234,21 +234,26 @@ export function textoCronograma(grupos: GrupoCuotas[], frecuencia?: Frecuencia):
 }
 
 // Lo que falta pagar de las cuotas pendientes, contando de cada una lo que queda (monto − pagado):
-// "Faltan pagar 2 cuotas de $ 25.000 · $ 50.000 en total". null si no falta nada.
+// "Faltan pagar 2 cuotas de $ 25.000 · $ 50.000 en total". Si el monto baja, agrega desde cuándo.
+// null si no falta nada.
 export function resumirFaltante(
   cuotas: CuotaActual[],
   hoy: string // 'YYYY-MM-DD'
 ): { texto: string; vencidas: number } | null {
   const pendientes = cuotasPendientes(cuotas).filter((q) => q.monto - q.montoPagado > 0);
   if (pendientes.length === 0) return null;
-  const cronograma = textoCronograma(
-    resumirCuotas(pendientes.map((q) => ({ monto: redondear(q.monto - q.montoPagado) })))
-  );
+  const restos = pendientes.map((q) => redondear(q.monto - q.montoPagado));
+  const cronograma = textoCronograma(resumirCuotas(restos.map((monto) => ({ monto }))));
+  const baja = restos.findIndex((monto, i) => i > 0 && monto < restos[i - 1] - 0.005);
+  const textoBaja =
+    baja > 0
+      ? ` · baja a ${formatearPesos(restos[baja])} desde el ${formatearDiaMes(pendientes[baja].fechaVencimiento)}`
+      : '';
   return {
     texto:
       pendientes.length === 1
         ? `Falta pagar ${cronograma}`
-        : `Faltan pagar ${cronograma} · ${formatearPesos(calcularDeuda(cuotas))} en total`,
+        : `Faltan pagar ${cronograma} · ${formatearPesos(calcularDeuda(cuotas))} en total${textoBaja}`,
     vencidas: pendientes.filter((q) => q.fechaVencimiento < hoy).length,
   };
 }
@@ -380,6 +385,24 @@ export function explicarCronograma(cuotas: CuotaConComponentes[]): string[] {
       ? `Queda 1 cuota de ${monto}`
       : `Las ${cuotas.length} cuotas son de ${monto}: el monto no cambia`,
   ];
+}
+
+// "Renovación del 18/11: le diste $ 50.000 al 20 % · suma $ 15.000 por cuota durante 4 cuotas".
+// `montos` son las partes que esa renovación agregó a cada cuota, en orden.
+export function textoRenovacion(r: FilaRenovacion, montos: number[]): string {
+  const tasa = r.tasa_interes === null ? '' : ` al ${r.tasa_interes} %`;
+  let texto = `Renovación del ${formatearDiaMes(r.fecha)}: le diste ${formatearPesos(r.entregado)}${tasa}`;
+  if (r.modo === 'descuento') {
+    texto += ` y se descontaron ${formatearPesos(r.deuda_anterior)} que debía`;
+  }
+  if (montos.length === 0) return texto;
+  const grupos = resumirCuotas(montos.map((monto) => ({ monto })));
+  const cuanto = formatearPesos(grupos[0].monto);
+  if (montos.length === 1) return `${texto} · suma ${cuanto} en 1 cuota`;
+  // La última cuota puede diferir por redondeo.
+  const ultima =
+    grupos.length > 1 ? ` (la última, ${formatearPesos(montos[montos.length - 1])})` : '';
+  return `${texto} · suma ${cuanto} por cuota durante ${montos.length} cuotas${ultima}`;
 }
 
 export type CuotaPrevista = CuotaConComponentes & {

@@ -23,6 +23,8 @@ import {
   actualizarCuota,
   eliminarPrestamoSinPagos,
   listarCuotas,
+  listarRenovaciones,
+  obtenerAdicionales,
   obtenerPrestamo,
   type Cuota,
   type PrestamoDetalle,
@@ -30,7 +32,15 @@ import {
 import { formatearDiaMes, formatearFecha, hoyISO } from '@/utils/formato';
 import { calcularMoraPendiente } from '@/utils/mora';
 import { reprogramarRecordatorios } from '@/utils/recordatorios';
-import { resumirFaltante } from '@/utils/renovacion';
+import {
+  componentesDeCuota,
+  montoOriginal,
+  resumirFaltante,
+  textoDesglose,
+  textoRenovacion,
+  type Adicional,
+  type FilaRenovacion,
+} from '@/utils/renovacion';
 
 const COLOR_PAGADA = Colors.primary;
 const COLOR_VENCIDA = Colors.danger;
@@ -49,6 +59,8 @@ export default function DetallePrestamoScreen() {
   const prestamoId = Number(id);
   const [prestamo, setPrestamo] = useState<PrestamoDetalle | null>(null);
   const [cuotas, setCuotas] = useState<Cuota[]>([]);
+  const [adicionales, setAdicionales] = useState<Map<number, Adicional[]>>(new Map());
+  const [renovaciones, setRenovaciones] = useState<FilaRenovacion[]>([]);
   const [cargando, setCargando] = useState(true);
   const [recarga, setRecarga] = useState(0);
   const [cuotaACobrar, setCuotaACobrar] = useState<Cuota | null>(null);
@@ -58,14 +70,19 @@ export default function DetallePrestamoScreen() {
   useFocusEffect(
     useCallback(() => {
       let activo = true;
-      Promise.all([obtenerPrestamo(db, prestamoId), listarCuotas(db, prestamoId)]).then(
-        ([filaPrestamo, filasCuotas]) => {
-          if (!activo) return;
-          setPrestamo(filaPrestamo);
-          setCuotas(filasCuotas);
-          setCargando(false);
-        }
-      );
+      Promise.all([
+        obtenerPrestamo(db, prestamoId),
+        listarCuotas(db, prestamoId),
+        obtenerAdicionales(db),
+        listarRenovaciones(db, prestamoId),
+      ]).then(([filaPrestamo, filasCuotas, partes, filasRenovaciones]) => {
+        if (!activo) return;
+        setPrestamo(filaPrestamo);
+        setCuotas(filasCuotas);
+        setAdicionales(partes);
+        setRenovaciones(filasRenovaciones);
+        setCargando(false);
+      });
       return () => {
         activo = false;
       };
@@ -120,6 +137,13 @@ export default function DetallePrestamoScreen() {
           hoy
         )
       : null;
+  // Lo que cada renovación le agregó a las cuotas, en orden.
+  const montosDe = (renovacionId: number) =>
+    cuotas.flatMap((q) =>
+      (adicionales.get(q.id) ?? [])
+        .filter((a) => a.renovacionId === renovacionId)
+        .map((a) => a.monto)
+    );
   const moraCobrada = redondear(cuotas.reduce((suma, q) => suma + q.mora_pagada, 0));
   // Suma de las cuotas: coincide con monto + interés, salvo que se haya editado alguna cuota.
   const totalADevolver = redondear(vigentes.reduce((suma, q) => suma + q.monto, 0));
@@ -251,6 +275,21 @@ export default function DetallePrestamoScreen() {
           ) : null}
         </ThemedView>
 
+        {renovaciones.length > 0 ? (
+          <ThemedView type="backgroundElement" style={styles.tarjeta}>
+            <ThemedText style={styles.destacado}>De qué se compone</ThemedText>
+            <ThemedText style={styles.texto}>
+              Crédito original: <Monto valor={montoOriginal(prestamo.monto, renovaciones)} /> al{' '}
+              {prestamo.tasa_interes} %
+            </ThemedText>
+            {renovaciones.map((r) => (
+              <ThemedText key={r.id} style={styles.texto}>
+                {textoRenovacion(r, montosDe(r.id))}
+              </ThemedText>
+            ))}
+          </ThemedView>
+        ) : null}
+
         {sePuedeRenovar ? (
           <BotonGrande
             texto="Renovar préstamo"
@@ -284,6 +323,9 @@ export default function DetallePrestamoScreen() {
           const pendiente = cuota.estado === 'pendiente';
           const { diasAtraso } = moraDe(cuota);
           const vencida = pendiente && diasAtraso > 0;
+          const componentes = cancelada
+            ? []
+            : componentesDeCuota(cuota.monto, adicionales.get(cuota.id));
           return (
             <ThemedView
               key={cuota.id}
@@ -292,6 +334,11 @@ export default function DetallePrestamoScreen() {
               <ThemedText style={styles.destacado}>
                 Cuota {cuota.numero}: <Monto valor={cuota.monto} />
               </ThemedText>
+              {componentes.length > 1 ? (
+                <ThemedText themeColor="textSecondary" style={styles.chico}>
+                  {textoDesglose(componentes)}
+                </ThemedText>
+              ) : null}
               <ThemedText style={styles.texto}>
                 Vence el {formatearFecha(cuota.fecha_vencimiento)}
               </ThemedText>
@@ -405,6 +452,10 @@ const styles = StyleSheet.create({
   texto: {
     fontSize: 20,
     lineHeight: 28,
+  },
+  chico: {
+    fontSize: 18,
+    lineHeight: 26,
   },
   destacado: {
     fontSize: 24,
